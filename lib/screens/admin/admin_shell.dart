@@ -10,6 +10,7 @@ import '../../providers/session_provider.dart';
 import '../../utils/theme_utils.dart';
 import '../../utils/time_utils.dart';
 import '../../widgets/admin/onboarding_tour.dart';
+import '../paywall/paywall_screen.dart';
 import 'timeline_editor.dart';
 import 'template_manager.dart';
 import 'display_settings_modal.dart';
@@ -342,7 +343,12 @@ class _AdminShellState extends ConsumerState<AdminShell> {
                       ),
                       OutlinedButton(
                         onPressed: () {
-                          // TODO: link to upgrade flow
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PaywallScreen(),
+                            ),
+                          );
                         },
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.brandPrimary,

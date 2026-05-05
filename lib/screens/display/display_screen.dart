@@ -197,12 +197,31 @@ class _DisplayScreenState extends ConsumerState<DisplayScreen>
     );
   }
 
+  /// Select display mode: use saved setting, or auto-detect from aspect ratio.
+  String _resolveDisplayMode(DisplaySettings settings) {
+    final mode = settings.mode;
+    if (mode != 'auto') return mode;
+
+    // Auto-detect based on screen aspect ratio
+    final size = MediaQuery.of(context).size;
+    final aspectRatio = size.width / size.height;
+
+    if (aspectRatio > 2.5) {
+      return 'horizontal'; // Ultra-wide panels
+    } else if (aspectRatio < 2.0) {
+      return 'multi-row'; // Standard screens / tablets
+    } else {
+      return 'horizontal'; // In-between — horizontal still works well
+    }
+  }
+
   Widget _buildDisplayMode(
     ActiveTimeline timeline,
     DisplaySettings settings,
     ThemeConfig theme,
   ) {
-    switch (settings.mode) {
+    final mode = _resolveDisplayMode(settings);
+    switch (mode) {
       case 'horizontal':
         return HorizontalDisplay(
           timeline: timeline,

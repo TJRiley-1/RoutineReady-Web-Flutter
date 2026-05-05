@@ -1,0 +1,72 @@
+name: Test & Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter pub get
+
+      - run: flutter analyze
+
+      - run: flutter test
+
+      - name: Build web
+        run: flutter build web --release --base-href "/app/"
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: prj_uAioRkBl0YuBeALuGUZxhfWKkqQn
+          VERCEL_ORG_ID: team_6raNlT6BAxVble9TbFtjuMB7
+        run: |
+          # Package Vercel output
+          mkdir -p .vercel-output/.vercel/output/static/app
+
+          cat > .vercel-output/.vercel/project.json <<EOF
+          {"projectId":"$VERCEL_PROJECT_ID","orgId":"$VERCEL_ORG_ID","projectName":"routine-ready-co-uk-web"}
+          EOF
+
+          cat > .vercel-output/.vercel/output/config.json <<'EOF'
+          {
+            "version": 3,
+            "routes": [
+              { "handle": "filesystem" },
+              { "src": "/app/(.*)", "dest": "/app/index.html" },
+              { "src": "/(.*)", "dest": "/index.html" }
+            ],
+            "headers": [
+              {
+                "source": "/(.*)",
+                "headers": [
+                  { "key": "X-Content-Type-Options", "value": "nosniff" },
+                  { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+                  { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+                  { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
+                ]
+              }
+            ]
+          }
+          EOF
+
+          # Landing page -> root
+          cp public/* .vercel-output/.vercel/output/static/ 2>/dev/null || true
+
+          # Flutter app -> /app/
+          rsync -a build/web/ .vercel-output/.vercel/output/static/app/
+
+          # Deploy
+          cd .vercel-output
+          vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
