@@ -327,3 +327,32 @@ BEGIN
     ON CONFLICT (org_id, user_id) DO NOTHING;
   END LOOP;
 END $$;
+
+-- ---------------------------------------------------------------------------
+-- RLS helper grants — DO NOT REVOKE from authenticated/anon.
+--
+-- An RLS policy expression is evaluated with the privileges of the role
+-- running the query (authenticated), NOT the policy/function owner. So any
+-- function referenced inside a USING/WITH CHECK expression must be EXECUTE-able
+-- by that role — even SECURITY DEFINER functions (DEFINER only changes the role
+-- *inside* the function body; the caller still needs EXECUTE to invoke it).
+--
+-- A previous "security advisor" pass revoked EXECUTE from authenticated/anon on
+-- these helpers, which broke every org-aware RLS policy with
+-- "42501 permission denied for function ...". These helpers only ever report
+-- facts about the current auth.uid() (own membership/ownership/role), so
+-- granting EXECUTE leaks nothing. Keep these grants in place.
+GRANT EXECUTE ON FUNCTION user_is_org_member(uuid)       TO authenticated;
+GRANT EXECUTE ON FUNCTION user_in_school_org(uuid)       TO authenticated;
+GRANT EXECUTE ON FUNCTION user_owns_school(uuid)         TO authenticated;
+GRANT EXECUTE ON FUNCTION user_role_in_school_org(uuid)  TO authenticated;
+
+-- check_contact_rate_limit(text,text) is called by the contact_messages INSERT
+-- policies (landing-page form), so anon + authenticated need EXECUTE on it too.
+-- It is defined in a later migration; grant only if present.
+DO $$
+BEGIN
+  IF to_regprocedure('check_contact_rate_limit(text,text)') IS NOT NULL THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION check_contact_rate_limit(text,text) TO anon, authenticated';
+  END IF;
+END $$;
