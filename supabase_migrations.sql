@@ -7,6 +7,7 @@ ALTER TABLE display_settings ADD COLUMN IF NOT EXISTS bottom_banner_height int D
 ALTER TABLE display_settings ADD COLUMN IF NOT EXISTS selected_sprite text DEFAULT 'penguin';
 ALTER TABLE display_settings ADD COLUMN IF NOT EXISTS selected_surface text DEFAULT 'ice';
 ALTER TABLE display_settings ADD COLUMN IF NOT EXISTS road_height int DEFAULT 32;
+ALTER TABLE display_settings ADD COLUMN IF NOT EXISTS auto_pan_road_width int NOT NULL DEFAULT 40;
 
 -- 2. Display Sessions - tracks active device connections
 CREATE TABLE IF NOT EXISTS display_sessions (

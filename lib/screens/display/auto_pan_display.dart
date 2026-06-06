@@ -125,7 +125,8 @@ class _AutoPanDisplayState extends State<AutoPanDisplay> {
                         elapsed: widget.elapsedInTask,
                         isPast: false,
                         isActive: true,
-                        width: MediaQuery.of(context).size.width * 0.4,
+                        width: MediaQuery.of(context).size.width *
+                            (widget.displaySettings.autoPanRoadWidth / 100),
                       ),
                       const SizedBox(height: 32),
                       AnimatedSwitcher(

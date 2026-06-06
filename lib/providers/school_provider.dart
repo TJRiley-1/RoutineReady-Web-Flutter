@@ -496,6 +496,10 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
     });
   }
 
+  /// Updates display settings in memory (drives the live admin preview) and the
+  /// local cache for offline display. Does NOT write to the database — DB
+  /// persistence is explicit via [saveDisplaySettingsNow] (the dialog's Save
+  /// button) or [saveAll] (the global "Save Changes" button).
   void updateDisplaySettings(DisplaySettings settings) {
     final current = state.valueOrNull;
     if (current == null) return;
@@ -504,10 +508,22 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       isUsingCachedData: false,
     ));
     ScheduleCache.saveDisplaySettings(settings, current.currentTheme, current.customThemes);
+  }
+
+  /// Persists the current display settings to the database immediately.
+  /// Throws if saving is unavailable (free plan / staff session) or if the
+  /// write fails, so callers can surface the outcome to the user.
+  Future<void> saveDisplaySettingsNow() async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    if (current.isFreeMode) {
+      throw StateError('Saving is unavailable on the free plan.');
+    }
+    if (current.isSessionOnlyMode) {
+      throw StateError("Staff sessions don't save changes.");
+    }
     _displaySettingsDebounce?.cancel();
-    _displaySettingsDebounce = Timer(_debounceDelay, () {
-      _saveDisplaySettingsToDb(settings, current.currentTheme);
-    });
+    await _saveDisplaySettingsToDb(current.displaySettings, current.currentTheme);
   }
 
   void updateCurrentTheme(String themeId) {
@@ -586,6 +602,11 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       await Future.wait([
         _saveWeeklyScheduleToDb(remappedSchedule),
         _saveTimelineConfigToDb(current.timeline, newActiveId),
+        // Also persist display settings + custom themes here: their debounces
+        // were cancelled above, so without these their pending changes would be
+        // dropped when the user clicks "Save Changes".
+        _saveDisplaySettingsToDb(current.displaySettings, current.currentTheme),
+        _saveCustomThemesToDb(current.customThemes),
       ]);
 
       state = AsyncData(current.copyWith(

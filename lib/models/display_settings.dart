@@ -16,6 +16,7 @@ class DisplaySettings {
   final String selectedSprite;
   final String selectedSurface;
   final int roadHeight;
+  final int autoPanRoadWidth;
   final bool autoOptimise;
 
   const DisplaySettings({
@@ -36,6 +37,7 @@ class DisplaySettings {
     this.selectedSprite = 'penguin',
     this.selectedSurface = 'ice',
     this.roadHeight = 32,
+    this.autoPanRoadWidth = 40,
     this.autoOptimise = false,
   });
 
@@ -58,6 +60,7 @@ class DisplaySettings {
       selectedSprite: json['selected_sprite'] as String? ?? 'penguin',
       selectedSurface: json['selected_surface'] as String? ?? 'ice',
       roadHeight: json['road_height'] as int? ?? 32,
+      autoPanRoadWidth: json['auto_pan_road_width'] as int? ?? 40,
       autoOptimise: json['auto_optimise'] as bool? ?? false,
     );
   }
@@ -80,6 +83,7 @@ class DisplaySettings {
         'selected_sprite': selectedSprite,
         'selected_surface': selectedSurface,
         'road_height': roadHeight,
+        'auto_pan_road_width': autoPanRoadWidth,
         'auto_optimise': autoOptimise,
       };
 
@@ -101,6 +105,7 @@ class DisplaySettings {
     String? selectedSprite,
     String? selectedSurface,
     int? roadHeight,
+    int? autoPanRoadWidth,
     bool? autoOptimise,
   }) {
     return DisplaySettings(
@@ -121,6 +126,7 @@ class DisplaySettings {
       selectedSprite: selectedSprite ?? this.selectedSprite,
       selectedSurface: selectedSurface ?? this.selectedSurface,
       roadHeight: roadHeight ?? this.roadHeight,
+      autoPanRoadWidth: autoPanRoadWidth ?? this.autoPanRoadWidth,
       autoOptimise: autoOptimise ?? this.autoOptimise,
     );
   }
