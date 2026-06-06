@@ -111,14 +111,25 @@ CREATE POLICY "Users delete own school"
   ON schools FOR DELETE
   USING (owner_id = auth.uid());
 
+-- ── RLS helper functions live in a non-API-exposed `private` schema ──
+-- They are SECURITY DEFINER and only ever report facts about the current
+-- auth.uid(). Keeping them out of `public` stops the Supabase security advisor
+-- flagging them as publicly-callable RPCs, while RLS policies can still call
+-- them (RLS runs as the querying role, which holds USAGE on `private` and
+-- EXECUTE on each function — see the grants block at the end of this file).
+-- DO NOT move these back to `public` or revoke EXECUTE: doing so breaks every
+-- org-aware policy with "42501 permission denied for function ...".
+CREATE SCHEMA IF NOT EXISTS private;
+GRANT USAGE ON SCHEMA private TO authenticated, anon;
+
 -- ── Helper function: check if school belongs to current user ──
 -- Used by all child tables to avoid repeating the subquery
-CREATE OR REPLACE FUNCTION user_owns_school(p_school_id uuid)
-RETURNS boolean AS $$
+CREATE OR REPLACE FUNCTION private.user_owns_school(p_school_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT EXISTS (
     SELECT 1 FROM schools WHERE id = p_school_id AND owner_id = auth.uid()
   );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$;
 
 -- ── templates ──
 ALTER TABLE templates ENABLE ROW LEVEL SECURITY;
@@ -126,8 +137,8 @@ ALTER TABLE templates ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users manage own templates" ON templates;
 CREATE POLICY "Users manage own templates"
   ON templates FOR ALL
-  USING (user_owns_school(school_id))
-  WITH CHECK (user_owns_school(school_id));
+  USING (private.user_owns_school(school_id))
+  WITH CHECK (private.user_owns_school(school_id));
 
 -- ── tasks ──
 -- Tasks belong to templates; verify ownership through the template's school_id
@@ -138,12 +149,12 @@ CREATE POLICY "Users manage own tasks"
   ON tasks FOR ALL
   USING (
     template_id IN (
-      SELECT id FROM templates WHERE user_owns_school(school_id)
+      SELECT id FROM templates WHERE private.user_owns_school(school_id)
     )
   )
   WITH CHECK (
     template_id IN (
-      SELECT id FROM templates WHERE user_owns_school(school_id)
+      SELECT id FROM templates WHERE private.user_owns_school(school_id)
     )
   );
 
@@ -153,8 +164,8 @@ ALTER TABLE active_timeline ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users manage own timeline" ON active_timeline;
 CREATE POLICY "Users manage own timeline"
   ON active_timeline FOR ALL
-  USING (user_owns_school(school_id))
-  WITH CHECK (user_owns_school(school_id));
+  USING (private.user_owns_school(school_id))
+  WITH CHECK (private.user_owns_school(school_id));
 
 -- ── display_settings ──
 ALTER TABLE display_settings ENABLE ROW LEVEL SECURITY;
@@ -162,8 +173,8 @@ ALTER TABLE display_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users manage own display settings" ON display_settings;
 CREATE POLICY "Users manage own display settings"
   ON display_settings FOR ALL
-  USING (user_owns_school(school_id))
-  WITH CHECK (user_owns_school(school_id));
+  USING (private.user_owns_school(school_id))
+  WITH CHECK (private.user_owns_school(school_id));
 
 -- ── weekly_schedules ──
 ALTER TABLE weekly_schedules ENABLE ROW LEVEL SECURITY;
@@ -171,8 +182,8 @@ ALTER TABLE weekly_schedules ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users manage own weekly schedules" ON weekly_schedules;
 CREATE POLICY "Users manage own weekly schedules"
   ON weekly_schedules FOR ALL
-  USING (user_owns_school(school_id))
-  WITH CHECK (user_owns_school(school_id));
+  USING (private.user_owns_school(school_id))
+  WITH CHECK (private.user_owns_school(school_id));
 
 -- ── custom_themes ──
 ALTER TABLE custom_themes ENABLE ROW LEVEL SECURITY;
@@ -180,8 +191,8 @@ ALTER TABLE custom_themes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users manage own custom themes" ON custom_themes;
 CREATE POLICY "Users manage own custom themes"
   ON custom_themes FOR ALL
-  USING (user_owns_school(school_id))
-  WITH CHECK (user_owns_school(school_id));
+  USING (private.user_owns_school(school_id))
+  WITH CHECK (private.user_owns_school(school_id));
 
 -- ── contact_messages (if table exists from web app) ──
 -- Anyone can submit a contact form (even unauthenticated via landing page)
@@ -267,45 +278,45 @@ ALTER TABLE schools ADD COLUMN IF NOT EXISTS org_id uuid REFERENCES organization
 CREATE INDEX IF NOT EXISTS idx_schools_org_id ON schools(org_id);
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS org_id uuid REFERENCES organizations ON DELETE CASCADE;
 
--- RLS helper functions for org-based access
-CREATE OR REPLACE FUNCTION user_in_school_org(p_school_id uuid)
-RETURNS boolean AS $$
+-- RLS helper functions for org-based access (also in the `private` schema)
+CREATE OR REPLACE FUNCTION private.user_in_school_org(p_school_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT EXISTS (
     SELECT 1 FROM org_members om
     JOIN schools s ON s.org_id = om.org_id
     WHERE s.id = p_school_id AND om.user_id = auth.uid()
   );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$;
 
-CREATE OR REPLACE FUNCTION user_is_org_member(p_org_id uuid)
-RETURNS boolean AS $$
+CREATE OR REPLACE FUNCTION private.user_is_org_member(p_org_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT EXISTS (
     SELECT 1 FROM org_members WHERE org_id = p_org_id AND user_id = auth.uid()
   );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$;
 
-CREATE OR REPLACE FUNCTION user_role_in_school_org(p_school_id uuid)
-RETURNS text AS $$
+CREATE OR REPLACE FUNCTION private.user_role_in_school_org(p_school_id uuid)
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT om.role FROM org_members om
   JOIN schools s ON s.org_id = om.org_id
   WHERE s.id = p_school_id AND om.user_id = auth.uid()
   LIMIT 1;
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$;
 
 -- RLS: organizations + org_members
 CREATE POLICY "Org members can view organization"
   ON organizations FOR SELECT
-  USING (user_is_org_member(id));
+  USING (private.user_is_org_member(id));
 
 CREATE POLICY "Org members can view memberships"
   ON org_members FOR SELECT
-  USING (user_is_org_member(org_id));
+  USING (private.user_is_org_member(org_id));
 
 -- Updated RLS: schools SELECT includes org members
 DROP POLICY IF EXISTS "Users select own school" ON schools;
 CREATE POLICY "Users select own school"
   ON schools FOR SELECT
-  USING (owner_id = auth.uid() OR user_in_school_org(id));
+  USING (owner_id = auth.uid() OR private.user_in_school_org(id));
 
 -- Updated RLS: all child tables split into SELECT (org-wide) + write (owner-only)
 -- See apply_migration for full policy definitions (active_timeline, display_settings,
@@ -329,30 +340,32 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- RLS helper grants — DO NOT REVOKE from authenticated/anon.
+-- RLS helper EXECUTE grants — DO NOT REVOKE from authenticated/anon.
 --
--- An RLS policy expression is evaluated with the privileges of the role
--- running the query (authenticated), NOT the policy/function owner. So any
--- function referenced inside a USING/WITH CHECK expression must be EXECUTE-able
--- by that role — even SECURITY DEFINER functions (DEFINER only changes the role
--- *inside* the function body; the caller still needs EXECUTE to invoke it).
+-- An RLS policy expression is evaluated with the privileges of the role running
+-- the query (authenticated/anon), NOT the policy/function owner. So any function
+-- referenced inside a USING/WITH CHECK expression must be EXECUTE-able by that
+-- role — even SECURITY DEFINER functions (DEFINER only changes the role *inside*
+-- the body; the caller still needs EXECUTE to invoke it). The roles also need
+-- USAGE on the `private` schema (granted above).
 --
--- A previous "security advisor" pass revoked EXECUTE from authenticated/anon on
--- these helpers, which broke every org-aware RLS policy with
--- "42501 permission denied for function ...". These helpers only ever report
--- facts about the current auth.uid() (own membership/ownership/role), so
--- granting EXECUTE leaks nothing. Keep these grants in place.
-GRANT EXECUTE ON FUNCTION user_is_org_member(uuid)       TO authenticated;
-GRANT EXECUTE ON FUNCTION user_in_school_org(uuid)       TO authenticated;
-GRANT EXECUTE ON FUNCTION user_owns_school(uuid)         TO authenticated;
-GRANT EXECUTE ON FUNCTION user_role_in_school_org(uuid)  TO authenticated;
+-- History: a "security advisor" pass once revoked EXECUTE from authenticated to
+-- silence the "SECURITY DEFINER function callable via RPC" lint. That broke every
+-- org-aware policy with "42501 permission denied for function ...". The durable
+-- fix is to keep the functions in the non-exposed `private` schema (so the lint
+-- no longer fires) AND keep these grants. They only report facts about the
+-- current auth.uid(), so granting EXECUTE leaks nothing.
+GRANT EXECUTE ON FUNCTION private.user_is_org_member(uuid)      TO authenticated;
+GRANT EXECUTE ON FUNCTION private.user_in_school_org(uuid)      TO authenticated;
+GRANT EXECUTE ON FUNCTION private.user_owns_school(uuid)        TO authenticated;
+GRANT EXECUTE ON FUNCTION private.user_role_in_school_org(uuid) TO authenticated;
 
--- check_contact_rate_limit(text,text) is called by the contact_messages INSERT
--- policies (landing-page form), so anon + authenticated need EXECUTE on it too.
--- It is defined in a later migration; grant only if present.
+-- check_contact_rate_limit(text,text) backs the contact_messages INSERT policies
+-- (landing-page form), so anon + authenticated need EXECUTE on it too. It is
+-- defined in a later migration; grant only if present.
 DO $$
 BEGIN
-  IF to_regprocedure('check_contact_rate_limit(text,text)') IS NOT NULL THEN
-    EXECUTE 'GRANT EXECUTE ON FUNCTION check_contact_rate_limit(text,text) TO anon, authenticated';
+  IF to_regprocedure('private.check_contact_rate_limit(text,text)') IS NOT NULL THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION private.check_contact_rate_limit(text,text) TO anon, authenticated';
   END IF;
 END $$;
