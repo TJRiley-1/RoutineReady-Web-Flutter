@@ -44,25 +44,15 @@ final organizationProvider = FutureProvider<Organization?>((ref) async {
 });
 
 /// All classrooms (schools) in the user's org.
-/// For teachers, filters to only their own classrooms.
+/// Every org member (incl. teachers) sees all classrooms in their org — RLS
+/// permits this via private.user_in_school_org. Per-user restrictions can be
+/// added later if needed; not required for MVP.
 final classroomsProvider = FutureProvider<List<School>>((ref) async {
   final membership = await ref.watch(membershipProvider.future);
   if (membership == null) return [];
 
   final client = ref.read(supabaseClientProvider);
 
-  if (membership.role == UserRole.teacher) {
-    // Teachers see only their own classrooms
-    final res = await client
-        .from('schools')
-        .select()
-        .eq('org_id', membership.orgId)
-        .eq('owner_id', membership.userId)
-        .order('class_name');
-    return (res as List).map((s) => School.fromJson(s)).toList();
-  }
-
-  // Staff, display, school_admin see all classrooms in org
   final res = await client
       .from('schools')
       .select()
