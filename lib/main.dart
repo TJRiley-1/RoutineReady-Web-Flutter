@@ -11,6 +11,12 @@ void main() async {
   await Supabase.initialize(
     url: SupabaseConfig.url,
     anonKey: SupabaseConfig.anonKey,
+    // Implicit flow so email-link auth (password reset, magic link, invite, etc.)
+    // works cross-device — the link carries the tokens itself and doesn't need a
+    // PKCE code verifier stored on the originating device.
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.implicit,
+    ),
   );
 
   // Initialize RevenueCat (no-op if API keys not yet configured)
