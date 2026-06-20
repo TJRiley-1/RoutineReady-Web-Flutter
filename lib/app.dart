@@ -82,6 +82,13 @@ class _AuthenticatedRouter extends ConsumerWidget {
       return const StaffAdminShell();
     }
 
+    // RoutineReady staff always land on the staff gate first — even if their
+    // account also has an org membership — so Staff Admin is always reachable.
+    // They can opt into the normal member view from the gate.
+    if (isStaffAdmin && !ref.watch(staffViewAsMemberProvider)) {
+      return _StaffAdminGate();
+    }
+
     final membershipAsync = ref.watch(membershipProvider);
 
     return membershipAsync.when(
@@ -106,10 +113,6 @@ class _AuthenticatedRouter extends ConsumerWidget {
       data: (membership) {
         // No org membership
         if (membership == null) {
-          // Staff admin accounts can open admin panel instead of dead-ending
-          if (isStaffAdmin) {
-            return _StaffAdminGate();
-          }
           return const _LegacyRouter();
         }
 
@@ -120,10 +123,14 @@ class _AuthenticatedRouter extends ConsumerWidget {
   }
 }
 
-/// Gate screen for staff accounts with no org membership.
+/// Gate screen for RoutineReady staff. Always reachable for staff accounts so
+/// Staff Admin is never blocked by also having an org membership.
 class _StaffAdminGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final hasMembership =
+        ref.watch(membershipProvider).valueOrNull != null;
+
     return Scaffold(
       body: Center(
         child: Column(
@@ -150,6 +157,19 @@ class _StaffAdminGate extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),
             ),
+            if (hasMembership) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  ref.read(staffViewAsMemberProvider.notifier).state = true;
+                },
+                icon: const Icon(Icons.meeting_room_outlined),
+                label: const Text('Continue to classrooms'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => ref.read(authActionsProvider).signOut(),

@@ -12,6 +12,11 @@ final isStaffAdminProvider = Provider<bool>((ref) {
 
 final staffAdminModeProvider = StateProvider<bool>((ref) => false);
 
+/// When a staff admin chooses to use the normal member experience (their own
+/// org membership) instead of the Staff Admin gate. Session-only; resets on
+/// reload so a staff admin always returns to the gate first.
+final staffViewAsMemberProvider = StateProvider<bool>((ref) => false);
+
 // --- Safe response parsing helpers ---
 
 List<Map<String, dynamic>> _parseList(dynamic data, String fallbackError) {
