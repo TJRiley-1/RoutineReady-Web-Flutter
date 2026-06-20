@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/theme_constants.dart';
 import 'models/org_member.dart';
 import 'providers/auth_provider.dart';
@@ -9,6 +10,7 @@ import 'providers/session_provider.dart';
 import 'providers/staff_admin_provider.dart';
 import 'providers/subscription_provider.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/set_password_screen.dart';
 import 'screens/auth/setup_wizard_screen.dart';
 import 'screens/classroom_picker/classroom_picker_screen.dart';
 import 'screens/mode_select/mode_select_screen.dart';
@@ -36,6 +38,16 @@ class _AppRouter extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
+    final inRecovery = ref.watch(passwordRecoveryProvider);
+
+    // Latch recovery mode so it survives the subsequent userUpdated event.
+    ref.listen(authStateProvider, (_, next) {
+      next.whenData((state) {
+        if (state.event == AuthChangeEvent.passwordRecovery) {
+          ref.read(passwordRecoveryProvider.notifier).state = true;
+        }
+      });
+    });
 
     return authState.when(
       loading: () => const Scaffold(
@@ -43,6 +55,11 @@ class _AppRouter extends ConsumerWidget {
       ),
       error: (_, _) => const LoginScreen(),
       data: (state) {
+        // Must intercept before the session check — recovery arrives WITH a
+        // session. Direct event check avoids a flash before the flag latches.
+        if (inRecovery || state.event == AuthChangeEvent.passwordRecovery) {
+          return const SetPasswordScreen();
+        }
         if (state.session == null) {
           return const LoginScreen();
         }

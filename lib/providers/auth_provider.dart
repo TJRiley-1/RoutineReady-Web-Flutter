@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -23,6 +24,11 @@ final authActionsProvider = Provider<AuthActions>((ref) {
   return AuthActions(ref);
 });
 
+/// True while the user is in a password-recovery session (arrived via a reset
+/// link) and must set a new password before entering the app. Latched on the
+/// `AuthChangeEvent.passwordRecovery` event; cleared once the password is set.
+final passwordRecoveryProvider = StateProvider<bool>((ref) => false);
+
 class AuthActions {
   final Ref _ref;
 
@@ -43,6 +49,20 @@ class AuthActions {
   }
 
   Future<void> resetPassword(String email) async {
-    await _client.auth.resetPasswordForEmail(email);
+    // On web, return the user to the site they requested the reset from (live or
+    // localhost). On non-web, fall back to the Supabase Site URL config.
+    final redirect = kIsWeb
+        ? Uri(
+            scheme: Uri.base.scheme,
+            host: Uri.base.host,
+            port: Uri.base.port,
+            path: Uri.base.path,
+          ).toString()
+        : null;
+    await _client.auth.resetPasswordForEmail(email, redirectTo: redirect);
+  }
+
+  Future<UserResponse> updatePassword(String newPassword) async {
+    return _client.auth.updateUser(UserAttributes(password: newPassword));
   }
 }
