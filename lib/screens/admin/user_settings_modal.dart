@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme_constants.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/membership_provider.dart';
 import '../../providers/school_provider.dart';
 import '../../providers/session_provider.dart';
 import '../../widgets/admin/onboarding_tour.dart';
@@ -51,6 +52,9 @@ class _UserSettingsModalState extends ConsumerState<UserSettingsModal> {
   Widget build(BuildContext context) {
     final schoolState = ref.watch(schoolProvider).valueOrNull;
     final user = ref.watch(currentUserProvider);
+    // Only meaningful in the org-based flow where a classroom was picked.
+    final hasSelectedClassroom =
+        ref.watch(selectedClassroomProvider) != null;
 
     return Dialog(
       child: ConstrainedBox(
@@ -251,6 +255,22 @@ class _UserSettingsModalState extends ConsumerState<UserSettingsModal> {
                       ),
 
                       const SizedBox(height: 24),
+                      if (hasSelectedClassroom)
+                        Center(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              // Return to the classroom picker (org members)
+                              // or the all-orgs picker (staff super-admins).
+                              ref
+                                  .read(selectedClassroomProvider.notifier)
+                                  .state = null;
+                              Navigator.pop(context);
+                            },
+                            icon: const Icon(Icons.swap_horiz, size: 18),
+                            label: const Text('Switch Classroom'),
+                          ),
+                        ),
+                      if (hasSelectedClassroom) const SizedBox(height: 12),
                       Center(
                         child: ElevatedButton(
                           onPressed: () {

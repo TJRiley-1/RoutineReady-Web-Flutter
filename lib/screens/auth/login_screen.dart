@@ -46,6 +46,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      setState(() => _error = 'Enter your email above, then tap Forgot password');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      await ref.read(authActionsProvider).resetPassword(email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'If an account exists for $email, a reset link has been sent.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _error = _friendlyError(e.toString()));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   String _friendlyError(String error) {
     if (error.contains('Invalid login credentials')) {
       return 'Invalid email or password';
@@ -157,7 +187,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: _isLoading ? null : _forgotPassword,
+                  child: const Text('Forgot password?'),
+                ),
+
+                const SizedBox(height: 8),
                 Text(
                   'Contact your school to get an account.',
                   textAlign: TextAlign.center,

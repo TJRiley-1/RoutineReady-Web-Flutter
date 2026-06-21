@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme_constants.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/staff_admin_provider.dart';
 import 'dialogs/create_user_dialog.dart';
 
@@ -156,10 +157,12 @@ class UserListView extends ConsumerWidget {
                 onPressed: () async {
                   Navigator.pop(ctx);
                   try {
-                    await ref.read(staffAdminActionsProvider).resetUserPassword(email);
+                    // Use the public resetPasswordForEmail (actually sends the
+                    // email) rather than the edge generateLink which doesn't.
+                    await ref.read(authActionsProvider).resetPassword(email);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Password reset initiated.')),
+                        SnackBar(content: Text('Password reset email sent to $email.')),
                       );
                     }
                   } catch (e) {
