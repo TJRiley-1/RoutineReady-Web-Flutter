@@ -8,6 +8,10 @@ class Task {
   final int width;
   final int height;
 
+  /// Multi-row mode: force a new row to start after this task, regardless of the
+  /// road width. Lets the user compose rows manually (e.g. 3 on top, 4 below).
+  final bool breakAfter;
+
   Task({
     required this.id,
     this.type = 'text',
@@ -17,6 +21,7 @@ class Task {
     this.icon,
     this.width = 200,
     this.height = 160,
+    this.breakAfter = false,
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
@@ -29,6 +34,8 @@ class Task {
       icon: json['icon'] as String?,
       width: json['width'] as int? ?? 200,
       height: json['height'] as int? ?? 160,
+      breakAfter:
+          json['breakAfter'] as bool? ?? json['break_after'] as bool? ?? false,
     );
   }
 
@@ -41,6 +48,7 @@ class Task {
         'icon': icon,
         'width': width,
         'height': height,
+        'breakAfter': breakAfter,
       };
 
   Task copyWith({
@@ -53,6 +61,7 @@ class Task {
     String? icon,
     int? width,
     int? height,
+    bool? breakAfter,
   }) {
     return Task(
       id: id ?? this.id,
@@ -63,6 +72,7 @@ class Task {
       icon: icon ?? this.icon,
       width: width ?? this.width,
       height: height ?? this.height,
+      breakAfter: breakAfter ?? this.breakAfter,
     );
   }
 }

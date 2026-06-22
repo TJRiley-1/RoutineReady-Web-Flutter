@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/active_timeline.dart';
 import '../../models/display_settings.dart';
+import '../../models/task.dart';
 import '../../models/theme_config.dart';
 import '../../widgets/display/task_card.dart';
 import '../../widgets/display/transition_indicator.dart';
@@ -68,8 +69,9 @@ class MultiRowDisplay extends StatelessWidget {
 
   /// Greedily packs task indices into rows so each row stays within [available].
   /// A card is preceded by a connector (transition + gaps) when it isn't first
-  /// in its row.
-  List<List<int>> _packRows(List tasks, double available) {
+  /// in its row. A task with [Task.breakAfter] forces the row to close after it,
+  /// letting the user compose rows manually regardless of width.
+  List<List<int>> _packRows(List<Task> tasks, double available) {
     final rows = <List<int>>[];
     var row = <int>[];
     var width = 0.0;
@@ -84,6 +86,11 @@ class MultiRowDisplay extends StatelessWidget {
       } else {
         row.add(i);
         width += connector + cardW;
+      }
+      if (tasks[i].breakAfter) {
+        rows.add(row);
+        row = [];
+        width = 0.0;
       }
     }
     if (row.isNotEmpty) rows.add(row);

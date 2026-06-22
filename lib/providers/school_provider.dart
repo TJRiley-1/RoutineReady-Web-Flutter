@@ -287,6 +287,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
           icon: task['icon'],
           width: task['width'] ?? 200,
           height: task['height'] ?? 160,
+          breakAfter: task['break_after'] ?? false,
         )).toList(),
         settings: tSettingsJson is Map<String, dynamic>
             ? DisplaySettings.fromDbJson(tSettingsJson)
@@ -496,6 +497,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
                 'duration': e.value.duration,
                 'width': e.value.width,
                 'height': e.value.height,
+                'break_after': e.value.breakAfter,
               })
           .toList(),
     );
@@ -1063,6 +1065,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
               'icon': e.value.icon,
               'width': e.value.width,
               'height': e.value.height,
+              'break_after': e.value.breakAfter,
             };
           }).toList(),
         );

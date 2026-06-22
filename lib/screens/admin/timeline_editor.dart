@@ -180,6 +180,18 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
                                       isActive: index == currentTaskIndex,
                                       width: 100,
                                     ),
+                                    // Manual row break (multi-row only) — not
+                                    // shown after the last task.
+                                    if (displaySettings.mode == 'multi-row' &&
+                                        index <
+                                            timeline.tasks.length - 1) ...[
+                                      const SizedBox(height: 6),
+                                      _RowBreakToggle(
+                                        active: task.breakAfter,
+                                        onTap: () =>
+                                            _toggleBreakAfter(task.id),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -375,6 +387,16 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
     ref.read(schoolProvider.notifier).updateTimeline(updated);
   }
 
+  void _toggleBreakAfter(dynamic taskId) {
+    final updated = widget.timeline.copyWith(
+      tasks: widget.timeline.tasks
+          .map((t) =>
+              t.id == taskId ? t.copyWith(breakAfter: !t.breakAfter) : t)
+          .toList(),
+    );
+    ref.read(schoolProvider.notifier).updateTimeline(updated);
+  }
+
   void _editTask(BuildContext context, Task task) {
     final schoolId = ref.read(schoolProvider).valueOrNull?.school.id;
     if (schoolId == null) return;
@@ -494,6 +516,52 @@ class _TaskEditCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A small toggle in a transition slot that forces a new row to start after the
+/// preceding task (multi-row mode).
+class _RowBreakToggle extends StatelessWidget {
+  final bool active;
+  final VoidCallback onTap;
+
+  const _RowBreakToggle({required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: active ? AppColors.brandPrimary : AppColors.brandBgSubtle,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: active ? AppColors.brandPrimary : AppColors.brandBorder,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.subdirectory_arrow_left,
+              size: 14,
+              color: active ? Colors.white : AppColors.brandTextMuted,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'New row',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: active ? Colors.white : AppColors.brandTextMuted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
