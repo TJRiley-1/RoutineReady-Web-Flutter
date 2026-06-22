@@ -58,7 +58,9 @@ class _HorizontalDisplayState extends State<HorizontalDisplay> {
     double offset = 148; // start time card width + gap
     for (var i = 0; i < widget.currentTaskIndex; i++) {
       final task = widget.timeline.tasks[i];
-      offset += task.width + (task.width * 1.5) + 16; // card + transition + gaps
+      offset += task.width +
+          (task.width * 1.5 * task.transitionScale) +
+          16; // card + transition + gaps
     }
 
     // Center the current task on screen
@@ -104,7 +106,7 @@ class _HorizontalDisplayState extends State<HorizontalDisplay> {
                 final task = widget.timeline.tasks[index];
                 final isCurrent = index == widget.currentTaskIndex;
                 final isPast = index < widget.currentTaskIndex;
-                final transitionWidth = (task.width * 1.5);
+                final transitionWidth = (task.width * 1.5 * task.transitionScale);
 
                 return Row(
                   children: [

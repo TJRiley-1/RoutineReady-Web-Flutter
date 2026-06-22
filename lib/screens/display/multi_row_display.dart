@@ -52,11 +52,10 @@ class MultiRowDisplay extends StatelessWidget {
     ];
 
     final isSnake = displaySettings.pathDirection == 'snake';
-    final roadFraction = displaySettings.multiRowWidth.clamp(20, 100) / 100;
-    // Width budget for the cards + transitions on a single row.
-    final available =
-        (displaySettings.width * roadFraction - _timeLabelReserve)
-            .clamp(_scale * 100, displaySettings.width.toDouble());
+    // Cards wrap at the full display width; per-transition widths (transitionScale)
+    // let the user stretch a row to fill it.
+    final available = (displaySettings.width - _timeLabelReserve)
+        .clamp(_scale * 100, displaySettings.width.toDouble());
 
     final rowsIdx = _packRows(items, available);
 
@@ -93,8 +92,10 @@ class MultiRowDisplay extends StatelessWidget {
     var width = 0.0;
     for (var i = 0; i < items.length; i++) {
       final cardW = items[i].width * _scale;
-      final connector =
-          row.isEmpty ? 0.0 : (items[i - 1].width * _scale + _gap * 2);
+      final connector = row.isEmpty
+          ? 0.0
+          : (items[i - 1].width * _scale * items[i - 1].transitionScale +
+              _gap * 2);
       if (row.isNotEmpty && width + connector + cardW > available) {
         rows.add(row);
         row = [i];
@@ -156,7 +157,7 @@ class MultiRowDisplay extends StatelessWidget {
                     elapsed: elapsedInTask,
                     isPast: isPast,
                     isActive: isCurrent,
-                    width: task.width * _scale,
+                    width: task.width * _scale * task.transitionScale,
                   ),
                   const SizedBox(width: _gap),
                 ],
@@ -187,7 +188,7 @@ class MultiRowDisplay extends StatelessWidget {
           elapsed: elapsedInTask,
           isPast: itemIndex < currentTaskIndex,
           isActive: itemIndex == currentTaskIndex,
-          width: task.width * _scale,
+          width: task.width * _scale * task.transitionScale,
         ),
         const SizedBox(width: _gap),
       ],

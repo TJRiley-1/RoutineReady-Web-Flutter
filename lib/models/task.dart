@@ -12,6 +12,11 @@ class Task {
   /// road width. Lets the user compose rows manually (e.g. 3 on top, 4 below).
   final bool breakAfter;
 
+  /// Width multiplier for the transition that follows this task. 1.0 = the
+  /// mode's default width; larger stretches the road to help fill a row. Visual
+  /// only — does not affect the transition's timing.
+  final double transitionScale;
+
   Task({
     required this.id,
     this.type = 'text',
@@ -22,6 +27,7 @@ class Task {
     this.width = 200,
     this.height = 160,
     this.breakAfter = false,
+    this.transitionScale = 1.0,
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
@@ -36,6 +42,9 @@ class Task {
       height: json['height'] as int? ?? 160,
       breakAfter:
           json['breakAfter'] as bool? ?? json['break_after'] as bool? ?? false,
+      transitionScale: (json['transitionScale'] as num?)?.toDouble() ??
+          (json['transition_scale'] as num?)?.toDouble() ??
+          1.0,
     );
   }
 
@@ -49,6 +58,7 @@ class Task {
         'width': width,
         'height': height,
         'breakAfter': breakAfter,
+        'transitionScale': transitionScale,
       };
 
   Task copyWith({
@@ -62,6 +72,7 @@ class Task {
     int? width,
     int? height,
     bool? breakAfter,
+    double? transitionScale,
   }) {
     return Task(
       id: id ?? this.id,
@@ -73,6 +84,7 @@ class Task {
       width: width ?? this.width,
       height: height ?? this.height,
       breakAfter: breakAfter ?? this.breakAfter,
+      transitionScale: transitionScale ?? this.transitionScale,
     );
   }
 }

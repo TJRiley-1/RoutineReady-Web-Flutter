@@ -46,6 +46,9 @@ class TimelineEditor extends ConsumerStatefulWidget {
 class _TimelineEditorState extends ConsumerState<TimelineEditor> {
   final ScrollController _taskScrollController = ScrollController();
 
+  /// Id of the task whose following transition is selected for width editing.
+  dynamic _selectedTransitionId;
+
   @override
   void dispose() {
     _taskScrollController.dispose();
@@ -159,41 +162,61 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
                             ),
                             const SizedBox(width: 8),
                             if (displaySettings.mode != 'auto-pan')
-                              SizedBox(
-                                width: 120,
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text(
-                                      'Transition',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: AppColors.brandTextMuted,
-                                      ),
+                              GestureDetector(
+                                onTap: () => setState(
+                                    () => _selectedTransitionId = task.id),
+                                child: Container(
+                                  width: 120,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 4, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _selectedTransitionId == task.id
+                                          ? AppColors.brandPrimary
+                                          : Colors.transparent,
+                                      width: 2,
                                     ),
-                                    const SizedBox(height: 4),
-                                    TransitionIndicator(
-                                      displaySettings: displaySettings,
-                                      theme: theme,
-                                      taskDuration: task.duration,
-                                      elapsed: elapsedInTask,
-                                      isPast: index < currentTaskIndex,
-                                      isActive: index == currentTaskIndex,
-                                      width: 100,
-                                    ),
-                                    // Manual row break (multi-row only) — not
-                                    // shown after the last task.
-                                    if (displaySettings.mode == 'multi-row' &&
-                                        index <
-                                            timeline.tasks.length - 1) ...[
-                                      const SizedBox(height: 6),
-                                      _RowBreakToggle(
-                                        active: task.breakAfter,
-                                        onTap: () =>
-                                            _toggleBreakAfter(task.id),
+                                    color: _selectedTransitionId == task.id
+                                        ? AppColors.brandPrimaryBg
+                                        : Colors.transparent,
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        task.transitionScale != 1.0
+                                            ? 'Transition ${task.transitionScale.toStringAsFixed(1)}×'
+                                            : 'Transition',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: AppColors.brandTextMuted,
+                                        ),
                                       ),
+                                      const SizedBox(height: 4),
+                                      TransitionIndicator(
+                                        displaySettings: displaySettings,
+                                        theme: theme,
+                                        taskDuration: task.duration,
+                                        elapsed: elapsedInTask,
+                                        isPast: index < currentTaskIndex,
+                                        isActive: index == currentTaskIndex,
+                                        width: 100,
+                                      ),
+                                      // Manual row break (multi-row only) — not
+                                      // shown after the last task.
+                                      if (displaySettings.mode == 'multi-row' &&
+                                          index <
+                                              timeline.tasks.length - 1) ...[
+                                        const SizedBox(height: 6),
+                                        _RowBreakToggle(
+                                          active: task.breakAfter,
+                                          onTap: () =>
+                                              _toggleBreakAfter(task.id),
+                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ),
                             const SizedBox(width: 8),
@@ -233,43 +256,11 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
             ),
             const SizedBox(height: 8),
 
-            // Road width — multi-row only. Lives here (not in Display Settings)
-            // so the reflow is visible live in the preview below. Saved per
-            // template via updateDisplaySettings.
-            if (displaySettings.mode == 'multi-row') ...[
-              Row(
-                children: [
-                  const Icon(Icons.swap_horiz,
-                      size: 18, color: AppColors.brandTextMuted),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Road width: ${displaySettings.multiRowWidth}%',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.brandText,
-                    ),
-                  ),
-                ],
-              ),
-              Slider(
-                value: displaySettings.multiRowWidth.clamp(40, 100).toDouble(),
-                min: 40,
-                max: 100,
-                divisions: 12,
-                label: '${displaySettings.multiRowWidth}%',
-                onChanged: (v) => ref
-                    .read(schoolProvider.notifier)
-                    .updateDisplaySettings(
-                        displaySettings.copyWith(multiRowWidth: v.round())),
-              ),
-              const Text(
-                'Wider fills more of the display; cards wrap to the next row at the edge.',
-                style:
-                    TextStyle(fontSize: 11, color: AppColors.brandTextMuted),
-              ),
-              const SizedBox(height: 12),
-            ],
+            // Transition width — stretch the selected transition to fill a row.
+            // Lives here (not in Display Settings) so the effect is visible live
+            // in the preview below. Saved per template (per task).
+            if (displaySettings.mode != 'auto-pan')
+              _buildTransitionWidthControl(timeline),
 
             // Live preview — use LayoutBuilder to fill available width
             LayoutBuilder(
@@ -423,6 +414,82 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
           widget.timeline
               .copyWith(endCard: _endCard.copyWith(enabled: !_endCard.enabled)),
         );
+  }
+
+  Widget _buildTransitionWidthControl(ActiveTimeline timeline) {
+    final matches =
+        timeline.tasks.where((t) => t.id == _selectedTransitionId);
+    final selected = matches.isEmpty ? null : matches.first;
+
+    if (selected == null) {
+      return const Padding(
+        padding: EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Icon(Icons.swap_horiz, size: 18, color: AppColors.brandTextMuted),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Tap a transition above to stretch it and fill the row.',
+                style:
+                    TextStyle(fontSize: 12, color: AppColors.brandTextMuted),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.swap_horiz,
+                  size: 18, color: AppColors.brandTextMuted),
+              const SizedBox(width: 8),
+              Text(
+                'Transition width: ${selected.transitionScale.toStringAsFixed(2)}×',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.brandText,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () =>
+                    setState(() => _selectedTransitionId = null),
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+          Slider(
+            value: selected.transitionScale.clamp(0.5, 8.0),
+            min: 0.5,
+            max: 8.0,
+            divisions: 30,
+            label: '${selected.transitionScale.toStringAsFixed(2)}×',
+            onChanged: (v) => _setTransitionScale(selected.id, v),
+          ),
+          const Text(
+            'Stretches the selected transition (and its road) — no effect on timing.',
+            style: TextStyle(fontSize: 11, color: AppColors.brandTextMuted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _setTransitionScale(dynamic taskId, double v) {
+    final updated = widget.timeline.copyWith(
+      tasks: widget.timeline.tasks
+          .map((t) => t.id == taskId ? t.copyWith(transitionScale: v) : t)
+          .toList(),
+    );
+    ref.read(schoolProvider.notifier).updateTimeline(updated);
   }
 
   void _toggleBreakAfter(dynamic taskId) {

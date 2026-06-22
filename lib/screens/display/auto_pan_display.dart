@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/icon_library.dart';
 import '../../models/active_timeline.dart';
 import '../../models/display_settings.dart';
+import '../../models/end_card.dart';
 import '../../models/theme_config.dart';
 import '../../utils/theme_utils.dart';
 import '../../widgets/display/banner_bar.dart';
@@ -30,13 +31,22 @@ class AutoPanDisplay extends StatefulWidget {
 class _AutoPanDisplayState extends State<AutoPanDisplay> {
   @override
   Widget build(BuildContext context) {
-    final currentTask =
-        widget.currentTaskIndex >= 0 && widget.currentTaskIndex < widget.timeline.tasks.length
-            ? widget.timeline.tasks[widget.currentTaskIndex]
-            : null;
-    final nextTask = widget.currentTaskIndex + 1 < widget.timeline.tasks.length
-        ? widget.timeline.tasks[widget.currentTaskIndex + 1]
-        : null;
+    final tasks = widget.timeline.tasks;
+    final idx = widget.currentTaskIndex;
+    final endCard = widget.timeline.endCard ?? EndCard.initial();
+
+    final realCurrent = idx >= 0 && idx < tasks.length ? tasks[idx] : null;
+    // Once the last real task is done, the end card becomes the current focus.
+    final currentIsEnd = realCurrent == null &&
+        endCard.enabled &&
+        tasks.isNotEmpty &&
+        idx >= tasks.length;
+    final currentTask = realCurrent ?? (currentIsEnd ? endCard.task : null);
+
+    final realNext = idx + 1 < tasks.length ? tasks[idx + 1] : null;
+    // After the last real task, the end card ("Home Time") is what's next.
+    final nextIsEnd = realNext == null && endCard.enabled && !currentIsEnd;
+    final nextTask = realNext ?? (nextIsEnd ? endCard.task : null);
 
     final borderColor = parseHexColor(widget.theme.cardBorderColor);
     final glowColor = parseHexColor(widget.theme.currentGlowColor);
@@ -91,7 +101,7 @@ class _AutoPanDisplayState extends State<AutoPanDisplay> {
                       child: currentTask != null
                           ? _TaskContent(
                               key: ValueKey('current-${widget.currentTaskIndex}'),
-                              label: 'CURRENT TASK',
+                              label: currentIsEnd ? 'FINISHED' : 'CURRENT TASK',
                               labelColor: glowColor,
                               task: currentTask,
                               theme: widget.theme,
@@ -99,6 +109,7 @@ class _AutoPanDisplayState extends State<AutoPanDisplay> {
                               iconSize: 80,
                               fontSize: 36,
                               durationFontSize: 24,
+                              hideDuration: currentIsEnd,
                             )
                           : const Center(
                               key: ValueKey('no-task'),
@@ -170,8 +181,10 @@ class _AutoPanDisplayState extends State<AutoPanDisplay> {
                       switchOutCurve: Curves.easeIn,
                       child: nextTask != null
                           ? _TaskContent(
-                              key: ValueKey('next-${widget.currentTaskIndex + 1}'),
-                              label: 'NEXT TASK',
+                              key: ValueKey(nextIsEnd
+                                  ? 'next-end'
+                                  : 'next-${widget.currentTaskIndex + 1}'),
+                              label: nextIsEnd ? 'THEN' : 'NEXT TASK',
                               labelColor: const Color(0xFF9CA3AF),
                               task: nextTask,
                               theme: widget.theme,
@@ -179,6 +192,7 @@ class _AutoPanDisplayState extends State<AutoPanDisplay> {
                               iconSize: 64,
                               fontSize: 28,
                               durationFontSize: 20,
+                              hideDuration: nextIsEnd,
                             )
                           : const Center(
                               key: ValueKey('all-done'),
@@ -217,6 +231,7 @@ class _TaskContent extends StatelessWidget {
   final double iconSize;
   final double fontSize;
   final double durationFontSize;
+  final bool hideDuration;
 
   const _TaskContent({
     super.key,
@@ -228,6 +243,7 @@ class _TaskContent extends StatelessWidget {
     required this.iconSize,
     required this.fontSize,
     required this.durationFontSize,
+    this.hideDuration = false,
   });
 
   @override
@@ -278,14 +294,16 @@ class _TaskContent extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        Text(
-          '${task.duration} min',
-          style: TextStyle(
-            fontSize: durationFontSize,
-            color: const Color(0xFF6B7280),
+        if (!hideDuration) ...[
+          const SizedBox(height: 16),
+          Text(
+            '${task.duration} min',
+            style: TextStyle(
+              fontSize: durationFontSize,
+              color: const Color(0xFF6B7280),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

@@ -86,9 +86,9 @@ class _DisplaySettingsModalState extends ConsumerState<DisplaySettingsModal> {
 
                       if (_settings.mode == 'multi-row') ...[
                         const Text(
-                          'Rows are automatic — set the row (road) width in the '
-                          'task editor, under the live preview. Cards wrap to a '
-                          'new row at the edge.',
+                          'Rows are automatic — cards wrap at the display edge. '
+                          'In the task editor you can force a new row after a '
+                          'task and stretch individual transitions to fill a row.',
                           style: TextStyle(
                               fontSize: 11, color: AppColors.brandTextMuted),
                         ),
