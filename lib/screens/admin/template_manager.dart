@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme_constants.dart';
-import '../../models/active_timeline.dart';
-import '../../models/task.dart';
 import '../../models/template.dart';
 import '../../models/weekly_schedule.dart';
 import '../../providers/school_provider.dart';
@@ -140,17 +138,8 @@ class _TemplateManagerState extends ConsumerState<TemplateManager> {
   }
 
   void _loadTemplate(TaskTemplate template) {
-    final newTimeline = ActiveTimeline(
-      startTime: template.startTime,
-      endTime: template.endTime,
-      tasks: template.tasks
-          .map((t) => Task.fromJson(t.toJson()))
-          .toList(),
-    );
-    ref.read(schoolProvider.notifier).updateTimeline(newTimeline);
-    ref
-        .read(schoolProvider.notifier)
-        .setActiveTemplateId(template.id.toString());
+    // Applies the template's tasks AND its per-template settings + theme.
+    ref.read(schoolProvider.notifier).loadTemplate(template);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Loaded "${template.name}"')),

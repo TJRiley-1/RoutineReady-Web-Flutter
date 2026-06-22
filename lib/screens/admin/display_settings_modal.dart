@@ -16,8 +16,6 @@ class DisplaySettingsModal extends ConsumerStatefulWidget {
 
 class _DisplaySettingsModalState extends ConsumerState<DisplaySettingsModal> {
   late DisplaySettings _settings;
-  bool _dirty = false;
-  bool _saving = false;
 
   @override
   void initState() {
@@ -28,34 +26,10 @@ class _DisplaySettingsModalState extends ConsumerState<DisplaySettingsModal> {
   }
 
   void _update(DisplaySettings s) {
-    setState(() {
-      _settings = s;
-      _dirty = true;
-    });
-    // Live preview only — persistence happens explicitly via the Save button.
+    setState(() => _settings = s);
+    // Auto-saves (debounced): classroom-wide fields (mode/transition/size) to the
+    // school; everything else to the active template + the live snapshot.
     ref.read(schoolProvider.notifier).updateDisplaySettings(s);
-  }
-
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    try {
-      await ref.read(schoolProvider.notifier).saveDisplaySettingsNow();
-      if (!mounted) return;
-      setState(() {
-        _saving = false;
-        _dirty = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Display settings saved')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      final message = e is StateError ? e.message : 'Could not save: $e';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
-      );
-    }
   }
 
   @override
@@ -560,23 +534,19 @@ class _DisplaySettingsModalState extends ConsumerState<DisplaySettingsModal> {
       );
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+    return const Row(
       children: [
-        ElevatedButton.icon(
-          onPressed: (_dirty && !_saving) ? _save : null,
-          icon: _saving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.save, size: 18),
-          label: Text(_saving
-              ? 'Saving…'
-              : _dirty
-                  ? 'Save'
-                  : 'Saved'),
+        Icon(Icons.cloud_done_outlined,
+            size: 16, color: AppColors.brandTextMuted),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Changes save automatically. Mode, transition style and screen size '
+            'apply to the whole classroom; everything else is saved to the '
+            'current template.',
+            style:
+                TextStyle(fontSize: 12, color: AppColors.brandTextMuted),
+          ),
         ),
       ],
     );

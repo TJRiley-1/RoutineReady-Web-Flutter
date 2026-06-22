@@ -1,4 +1,5 @@
 import 'task.dart';
+import 'display_settings.dart';
 
 class TaskTemplate {
   final dynamic id;
@@ -7,15 +8,25 @@ class TaskTemplate {
   final String endTime;
   final List<Task> tasks;
 
+  /// Per-template display settings. The classroom-wide fields (mode, transition,
+  /// width, height) are ignored here and resolved from `display_settings` at use.
+  final DisplaySettings settings;
+
+  /// Per-template theme id. Null falls back to the school default.
+  final String? theme;
+
   TaskTemplate({
     required this.id,
     required this.name,
     this.startTime = '08:00',
     this.endTime = '10:30',
     this.tasks = const [],
+    this.settings = const DisplaySettings(),
+    this.theme,
   });
 
   factory TaskTemplate.fromJson(Map<String, dynamic> json) {
+    final settingsJson = json['settings'] ?? json['settings_json'];
     return TaskTemplate(
       id: json['id'],
       name: json['name'] as String? ?? 'Untitled',
@@ -25,6 +36,10 @@ class TaskTemplate {
               ?.map((t) => Task.fromJson(t as Map<String, dynamic>))
               .toList() ??
           [],
+      settings: settingsJson is Map<String, dynamic>
+          ? DisplaySettings.fromDbJson(settingsJson)
+          : const DisplaySettings(),
+      theme: json['theme'] as String? ?? json['current_theme'] as String?,
     );
   }
 
@@ -34,6 +49,8 @@ class TaskTemplate {
         'startTime': startTime,
         'endTime': endTime,
         'tasks': tasks.map((t) => t.toJson()).toList(),
+        'settings': settings.toTemplateDbJson(),
+        'theme': theme,
       };
 
   TaskTemplate copyWith({
@@ -42,6 +59,8 @@ class TaskTemplate {
     String? startTime,
     String? endTime,
     List<Task>? tasks,
+    DisplaySettings? settings,
+    String? theme,
   }) {
     return TaskTemplate(
       id: id ?? this.id,
@@ -49,6 +68,8 @@ class TaskTemplate {
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       tasks: tasks ?? this.tasks,
+      settings: settings ?? this.settings,
+      theme: theme ?? this.theme,
     );
   }
 }

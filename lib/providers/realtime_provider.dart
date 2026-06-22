@@ -2,8 +2,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/active_timeline.dart';
-import '../models/display_settings.dart';
-import '../models/task.dart';
 import 'auth_provider.dart';
 import 'school_provider.dart';
 
@@ -100,28 +98,20 @@ class RealtimeManager {
     final newData = payload.newRecord;
     if (newData.isEmpty) return;
 
-    final schoolNotifier = _ref.read(schoolProvider.notifier);
-    final timeline = ActiveTimeline(
-      startTime: newData['start_time'] ?? '08:00',
-      endTime: newData['end_time'] ?? '10:30',
-      tasks: ((newData['tasks_json'] ?? []) as List)
-          .map((t) => Task.fromJson(t as Map<String, dynamic>))
-          .toList(),
-    );
-    schoolNotifier.updateTimeline(timeline);
+    // Carries tasks plus the per-template settings/theme snapshot — this is how
+    // a peer device receives per-template changes live.
+    _ref
+        .read(schoolProvider.notifier)
+        .applyRemoteTimeline(ActiveTimeline.fromJson(newData));
   }
 
   void _handleDisplaySettingsChange(PostgresChangePayload payload) {
     final newData = payload.newRecord;
     if (newData.isEmpty) return;
 
-    final schoolNotifier = _ref.read(schoolProvider.notifier);
-    schoolNotifier.updateDisplaySettings(DisplaySettings.fromDbJson(newData));
-
-    final newTheme = newData['current_theme'] as String?;
-    if (newTheme != null) {
-      schoolNotifier.updateCurrentTheme(newTheme);
-    }
+    // Only the classroom-wide fields live here now; per-template settings + theme
+    // arrive via the active_timeline snapshot above.
+    _ref.read(schoolProvider.notifier).applyRemoteGlobals(newData);
   }
 
   void unsubscribe() {

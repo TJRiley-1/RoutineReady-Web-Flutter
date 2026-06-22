@@ -144,6 +144,9 @@ class _AdminShellState extends ConsumerState<AdminShell> {
                   tasks: schoolState.timeline.tasks
                       .map((t) => Task.fromJson(t.toJson()))
                       .toList(),
+                  // Capture the current look so it follows this template.
+                  settings: schoolState.displaySettings,
+                  theme: schoolState.currentTheme,
                 );
                 ref.read(schoolProvider.notifier).updateTemplates(
                     [...schoolState.templates, newTemplate]);

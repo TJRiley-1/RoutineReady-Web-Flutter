@@ -250,9 +250,11 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
         .limit(1)
         .maybeSingle();
 
-    final displaySettings =
+    // Classroom-wide settings (mode/transition/width/height authoritative; the
+    // other columns act as defaults for ad-hoc timelines / new templates).
+    final globalSettings =
         dsRes != null ? DisplaySettings.fromDbJson(dsRes) : const DisplaySettings();
-    final currentTheme =
+    final defaultTheme =
         dsRes != null ? (dsRes['current_theme'] as String? ?? 'routine-ready') : 'routine-ready';
 
     // 3. Load templates with tasks
@@ -270,6 +272,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
           .eq('template_id', t['id'])
           .order('sort_order');
 
+      final tSettingsJson = t['settings_json'];
       templates.add(TaskTemplate(
         id: t['id'],
         name: t['name'] ?? 'Untitled',
@@ -285,6 +288,10 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
           width: task['width'] ?? 200,
           height: task['height'] ?? 160,
         )).toList(),
+        settings: tSettingsJson is Map<String, dynamic>
+            ? DisplaySettings.fromDbJson(tSettingsJson)
+            : const DisplaySettings(),
+        theme: t['current_theme'] as String?,
       ));
     }
 
@@ -296,6 +303,12 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
         .limit(1)
         .maybeSingle();
 
+    final atSettingsJson = atRes?['settings_json'];
+    final atSettings = atSettingsJson is Map<String, dynamic>
+        ? DisplaySettings.fromDbJson(atSettingsJson)
+        : null;
+    final atTheme = atRes?['current_theme'] as String?;
+
     final timeline = atRes != null
         ? ActiveTimeline(
             startTime: atRes['start_time'] ?? '08:00',
@@ -303,10 +316,23 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
             tasks: ((atRes['tasks_json'] ?? []) as List)
                 .map((t) => Task.fromJson(t as Map<String, dynamic>))
                 .toList(),
+            settings: atSettings,
+            theme: atTheme,
           )
         : defaultTimelineConfig;
 
     final activeTemplateId = atRes?['template_id'] as String?;
+
+    // Resolve the settings the display renders: per-template values (from the
+    // active_timeline snapshot, else the active template) with classroom-wide
+    // fields forced from globalSettings.
+    final activeTemplate = activeTemplateId != null
+        ? templates.where((t) => t.id.toString() == activeTemplateId).firstOrNull
+        : null;
+    final perTemplateSettings =
+        atSettings ?? activeTemplate?.settings ?? globalSettings;
+    final displaySettings = perTemplateSettings.withGlobalsFrom(globalSettings);
+    final currentTheme = atTheme ?? activeTemplate?.theme ?? defaultTheme;
 
     // 5. Load weekly schedule
     final wsRes = await _client
@@ -370,12 +396,17 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
           tasks: todayTemplate.tasks
               .map((t) => Task.fromJson(t.toJson()))
               .toList(),
+          settings: todayTemplate.settings,
+          theme: todayTemplate.theme,
         );
         result = result.copyWith(
           timeline: autoTimeline,
           activeTemplateId: todayTemplateId,
+          // The template's settings/theme follow it onto the display.
+          displaySettings: todayTemplate.settings.withGlobalsFrom(globalSettings),
+          currentTheme: todayTemplate.theme ?? defaultTheme,
         );
-        // Persist the auto-loaded timeline
+        // Persist the auto-loaded timeline (incl. its settings snapshot)
         _autoSaveTimeline(school.id, autoTimeline, todayTemplateId);
       }
     }
@@ -391,6 +422,8 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       'start_time': timeline.startTime,
       'end_time': timeline.endTime,
       'tasks_json': timeline.tasks.map((t) => t.toJson()).toList(),
+      'settings_json': timeline.settings?.toTemplateDbJson(),
+      'current_theme': timeline.theme,
     };
 
     final existing = await _client
@@ -445,6 +478,8 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
           'name': 'Template 1',
           'start_time': '08:00',
           'end_time': '10:30',
+          'settings_json': const DisplaySettings().toTemplateDbJson(),
+          'current_theme': 'routine-ready',
         })
         .select()
         .single();
@@ -468,9 +503,12 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
     // Create active timeline
     await _client.from('active_timeline').insert({
       'school_id': school.id,
+      'template_id': templateRes['id'],
       'start_time': '08:00',
       'end_time': '10:30',
       'tasks_json': defaultTasks.map((t) => t.toJson()).toList(),
+      'settings_json': const DisplaySettings().toTemplateDbJson(),
+      'current_theme': 'routine-ready',
     });
 
     // Create weekly schedule
@@ -496,23 +534,54 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
     });
   }
 
-  /// Updates display settings in memory (drives the live admin preview) and the
-  /// local cache for offline display. Does NOT write to the database — DB
-  /// persistence is explicit via [saveDisplaySettingsNow] (the dialog's Save
-  /// button) or [saveAll] (the global "Save Changes" button).
+  /// Updates the resolved display settings in memory (drives the live admin
+  /// preview + offline cache) and auto-saves (debounced): the classroom-wide
+  /// fields go to `display_settings`; the per-template fields follow the active
+  /// template (and are always snapshotted onto `active_timeline` for the
+  /// display, realtime peers and offline cache).
   void updateDisplaySettings(DisplaySettings settings) {
     final current = state.valueOrNull;
     if (current == null) return;
+
+    // Keep the active template's in-memory settings in sync so reloads + saveAll
+    // reflect the change ("the settings follow the template").
+    final activeId = current.activeTemplateId;
+    final templates = activeId != null
+        ? current.templates
+            .map((t) => t.id.toString() == activeId
+                ? t.copyWith(settings: settings, theme: current.currentTheme)
+                : t)
+            .toList()
+        : current.templates;
+
     state = AsyncData(current.copyWith(
       displaySettings: settings,
+      templates: templates,
       isUsingCachedData: false,
     ));
     ScheduleCache.saveDisplaySettings(settings, current.currentTheme, current.customThemes);
+
+    _displaySettingsDebounce?.cancel();
+    _displaySettingsDebounce = Timer(_debounceDelay, () {
+      _persistSettingsEdit(settings, current.currentTheme, activeId);
+    });
   }
 
-  /// Persists the current display settings to the database immediately.
-  /// Throws if saving is unavailable (free plan / staff session) or if the
-  /// write fails, so callers can surface the outcome to the user.
+  /// Writes a settings/theme edit to its homes: globals → `display_settings`,
+  /// per-template → the active template (when DB-backed) + the `active_timeline`
+  /// snapshot.
+  Future<void> _persistSettingsEdit(
+      DisplaySettings settings, String theme, String? activeTemplateId) async {
+    if (_skipDbWrites) return;
+    await _saveGlobalDisplaySettingsToDb(settings);
+    if (activeTemplateId != null) {
+      await _saveTemplateSettingsToDb(activeTemplateId, settings, theme);
+    }
+    await _saveTimelineSnapshotToDb(settings, theme);
+  }
+
+  /// Flushes any pending settings edit immediately. Throws if saving is
+  /// unavailable so the dialog can surface why nothing persisted.
   Future<void> saveDisplaySettingsNow() async {
     final current = state.valueOrNull;
     if (current == null) return;
@@ -523,21 +592,101 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       throw StateError("Staff sessions don't save changes.");
     }
     _displaySettingsDebounce?.cancel();
-    await _saveDisplaySettingsToDb(current.displaySettings, current.currentTheme);
+    await _persistSettingsEdit(
+        current.displaySettings, current.currentTheme, current.activeTemplateId);
   }
 
   void updateCurrentTheme(String themeId) {
     final current = state.valueOrNull;
     if (current == null) return;
+
+    final activeId = current.activeTemplateId;
+    final templates = activeId != null
+        ? current.templates
+            .map((t) =>
+                t.id.toString() == activeId ? t.copyWith(theme: themeId) : t)
+            .toList()
+        : current.templates;
+
     state = AsyncData(current.copyWith(
       currentTheme: themeId,
+      templates: templates,
       isUsingCachedData: false,
     ));
     ScheduleCache.saveDisplaySettings(current.displaySettings, themeId, current.customThemes);
     _displaySettingsDebounce?.cancel();
     _displaySettingsDebounce = Timer(_debounceDelay, () {
-      _saveDisplaySettingsToDb(current.displaySettings, themeId);
+      _persistSettingsEdit(current.displaySettings, themeId, activeId);
     });
+  }
+
+  /// Loads a template into the active timeline, applying its per-template
+  /// settings + theme (classroom-wide fields stay as the screen's). Used by the
+  /// "Load" button and day-of-week auto-load.
+  void loadTemplate(TaskTemplate template) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+
+    final newTimeline = ActiveTimeline(
+      startTime: template.startTime,
+      endTime: template.endTime,
+      tasks: template.tasks.map((t) => Task.fromJson(t.toJson())).toList(),
+      settings: template.settings,
+      theme: template.theme,
+    );
+    final resolved = template.settings.withGlobalsFrom(current.displaySettings);
+    final theme = template.theme ?? current.currentTheme;
+
+    state = AsyncData(current.copyWith(
+      timeline: newTimeline,
+      displaySettings: resolved,
+      currentTheme: theme,
+      activeTemplateId: template.id.toString(),
+      hasUnsavedChanges: true,
+      isUsingCachedData: false,
+    ));
+    ScheduleCache.saveAll(newTimeline, resolved, theme, current.customThemes);
+    _timelineDebounce?.cancel();
+    _timelineDebounce = Timer(_debounceDelay, () {
+      _saveTimelineToDb(newTimeline, template.id.toString());
+    });
+  }
+
+  /// Realtime: merge only the classroom-wide fields from a remote
+  /// `display_settings` change into the resolved settings (no DB write-back).
+  void applyRemoteGlobals(Map<String, dynamic> row) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final resolved = current.displaySettings.copyWith(
+      mode: row['mode'] as String?,
+      transitionType: row['transition_type'] as String?,
+      width: row['width'] as int?,
+      height: row['height'] as int?,
+    );
+    state = AsyncData(current.copyWith(
+      displaySettings: resolved,
+      isUsingCachedData: false,
+    ));
+    ScheduleCache.saveDisplaySettings(
+        resolved, current.currentTheme, current.customThemes);
+  }
+
+  /// Realtime: apply a remote `active_timeline` change — tasks plus the
+  /// per-template settings/theme snapshot (no DB write-back).
+  void applyRemoteTimeline(ActiveTimeline snapshot) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final resolved = snapshot.settings != null
+        ? snapshot.settings!.withGlobalsFrom(current.displaySettings)
+        : current.displaySettings;
+    final theme = snapshot.theme ?? current.currentTheme;
+    state = AsyncData(current.copyWith(
+      timeline: snapshot,
+      displaySettings: resolved,
+      currentTheme: theme,
+      isUsingCachedData: false,
+    ));
+    ScheduleCache.saveAll(snapshot, resolved, theme, current.customThemes);
   }
 
   void updateTemplates(List<TaskTemplate> templates) {
@@ -601,11 +750,13 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
 
       await Future.wait([
         _saveWeeklyScheduleToDb(remappedSchedule),
+        // Persists the timeline incl. its per-template settings/theme snapshot.
         _saveTimelineConfigToDb(current.timeline, newActiveId),
-        // Also persist display settings + custom themes here: their debounces
-        // were cancelled above, so without these their pending changes would be
-        // dropped when the user clicks "Save Changes".
-        _saveDisplaySettingsToDb(current.displaySettings, current.currentTheme),
+        // Also persist classroom-wide settings + custom themes here: their
+        // debounces were cancelled above, so without these their pending changes
+        // would be dropped when the user clicks "Save Changes". (Per-template
+        // settings ride along on _saveTemplatesToDb + the timeline snapshot.)
+        _saveGlobalDisplaySettingsToDb(current.displaySettings),
         _saveCustomThemesToDb(current.customThemes),
       ]);
 
@@ -769,6 +920,10 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       'start_time': timeline.startTime,
       'end_time': timeline.endTime,
       'tasks_json': timeline.tasks.map((t) => t.toJson()).toList(),
+      // Snapshot the resolved per-template settings + theme alongside the tasks
+      // so the display, realtime peers and offline cache stay correct.
+      'settings_json': current.displaySettings.toTemplateDbJson(),
+      'current_theme': current.currentTheme,
     };
 
     final existing = await _client
@@ -787,6 +942,82 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       await _client.from('active_timeline').insert(payload);
     }
   }
+
+  /// Writes only the classroom-wide columns to `display_settings`.
+  Future<void> _saveGlobalDisplaySettingsToDb(DisplaySettings settings) async {
+    if (_skipDbWrites) return;
+    final current = state.valueOrNull;
+    if (current == null) return;
+
+    final payload = {
+      'mode': settings.mode,
+      'transition_type': settings.transitionType,
+      'width': settings.width,
+      'height': settings.height,
+      'school_id': current.school.id,
+    };
+
+    final existing = await _client
+        .from('display_settings')
+        .select('id')
+        .eq('school_id', current.school.id)
+        .limit(1)
+        .maybeSingle();
+
+    if (existing != null) {
+      await _client
+          .from('display_settings')
+          .update(payload)
+          .eq('id', existing['id']);
+    } else {
+      await _client.from('display_settings').insert(payload);
+    }
+  }
+
+  /// Persists a template's per-template settings + theme directly. No-op for
+  /// client-side (not-yet-saved) template ids — those persist via [saveAll].
+  Future<void> _saveTemplateSettingsToDb(
+      String templateId, DisplaySettings settings, String? theme) async {
+    if (_skipDbWrites) return;
+    if (!_uuidPattern.hasMatch(templateId)) return;
+    final current = state.valueOrNull;
+    if (current == null) return;
+
+    await _client
+        .from('templates')
+        .update({
+          'settings_json': settings.toTemplateDbJson(),
+          'current_theme': theme,
+        })
+        .eq('id', templateId)
+        .eq('school_id', current.school.id);
+  }
+
+  /// Updates only the settings/theme snapshot on the existing `active_timeline`
+  /// row (the tasks are untouched).
+  Future<void> _saveTimelineSnapshotToDb(
+      DisplaySettings settings, String theme) async {
+    if (_skipDbWrites) return;
+    final current = state.valueOrNull;
+    if (current == null) return;
+
+    final existing = await _client
+        .from('active_timeline')
+        .select('id')
+        .eq('school_id', current.school.id)
+        .limit(1)
+        .maybeSingle();
+
+    if (existing != null) {
+      await _client.from('active_timeline').update({
+        'settings_json': settings.toTemplateDbJson(),
+        'current_theme': theme,
+      }).eq('id', existing['id']);
+    }
+  }
+
+  static final _uuidPattern = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
 
   Future<void> _saveTimelineConfigToDb(
       ActiveTimeline timeline, String? templateId) async {
@@ -811,6 +1042,8 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
             'name': t.name,
             'start_time': t.startTime,
             'end_time': t.endTime,
+            'settings_json': t.settings.toTemplateDbJson(),
+            'current_theme': t.theme,
           })
           .select()
           .single();

@@ -87,6 +87,30 @@ class DisplaySettings {
         'auto_optimise': autoOptimise,
       };
 
+  /// DB keys that stay classroom-wide (live in `display_settings`, not on a
+  /// template). Everything else follows the template.
+  static const globalDbKeys = {'mode', 'transition_type', 'width', 'height'};
+
+  /// Returns a copy with the classroom-wide fields taken from [global], keeping
+  /// every per-template field from `this`. Used to resolve the settings the
+  /// display actually renders: per-template values + the screen's globals.
+  DisplaySettings withGlobalsFrom(DisplaySettings global) => copyWith(
+        mode: global.mode,
+        transitionType: global.transitionType,
+        width: global.width,
+        height: global.height,
+      );
+
+  /// Per-template subset of [toDbJson] — the classroom-wide keys removed. Stored
+  /// in `templates.settings_json` and the `active_timeline` snapshot.
+  Map<String, dynamic> toTemplateDbJson() {
+    final json = toDbJson();
+    for (final k in globalDbKeys) {
+      json.remove(k);
+    }
+    return json;
+  }
+
   DisplaySettings copyWith({
     int? width,
     int? height,
