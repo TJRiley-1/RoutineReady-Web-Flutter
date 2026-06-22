@@ -65,8 +65,11 @@
           </div>
 
           <div class="login-error" id="login-error" style="display:none;margin-top:0.75rem;padding:0.5rem 0.75rem;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#dc2626;font-size:0.8rem"></div>
+          <div class="login-info" id="login-info" style="display:none;margin-top:0.75rem;padding:0.5rem 0.75rem;background:#f0faf9;border:1px solid #99d6d1;border-radius:6px;color:#0f5550;font-size:0.8rem"></div>
 
           <button type="submit" class="btn-primary" id="login-submit" style="width:100%;padding:0.65rem;font-size:0.9rem;border-radius:6px;margin-top:0.75rem">Access my classroom →</button>
+
+          <button type="button" id="forgot-password-link" style="display:block;margin:0.6rem auto 0;background:none;border:none;color:#1a7f7a;font-size:0.8rem;cursor:pointer;text-decoration:underline;font-family:inherit">Forgot password?</button>
         </form>
 
         <div class="login-divider" id="login-divider">or</div>
@@ -555,6 +558,29 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     submitBtn.textContent = 'Access my classroom →'
   } else {
     location.href = '/app'
+  }
+})
+
+document.getElementById('forgot-password-link').addEventListener('click', async () => {
+  const errorEl = document.getElementById('login-error')
+  const infoEl = document.getElementById('login-info')
+  errorEl.style.display = 'none'
+  infoEl.style.display = 'none'
+  const email = document.getElementById('email').value.trim()
+  if (!email) {
+    errorEl.textContent = 'Enter your email above, then tap Forgot password.'
+    errorEl.style.display = 'block'
+    return
+  }
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: location.origin + '/app/',
+  })
+  if (error) {
+    errorEl.textContent = error.message
+    errorEl.style.display = 'block'
+  } else {
+    infoEl.textContent = 'If an account exists for ' + email + ', a reset link has been sent.'
+    infoEl.style.display = 'block'
   }
 })
 
