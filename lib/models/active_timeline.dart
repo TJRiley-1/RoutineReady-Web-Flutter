@@ -1,5 +1,6 @@
 import 'task.dart';
 import 'display_settings.dart';
+import 'end_card.dart';
 
 class ActiveTimeline {
   final String startTime;
@@ -13,17 +14,22 @@ class ActiveTimeline {
   /// Snapshot of the theme currently shown. Null falls back to school default.
   final String? theme;
 
+  /// The end ("Home Time") card. Null falls back to the default.
+  final EndCard? endCard;
+
   ActiveTimeline({
     this.startTime = '08:00',
     this.endTime = '10:30',
     this.tasks = const [],
     this.settings,
     this.theme,
+    this.endCard,
   });
 
   factory ActiveTimeline.fromJson(Map<String, dynamic> json) {
     final tasksJson = json['tasks_json'] ?? json['tasks'] ?? [];
     final settingsJson = json['settings_json'] ?? json['settings'];
+    final endCardJson = json['end_card_json'] ?? json['endCard'];
     return ActiveTimeline(
       startTime: json['start_time'] as String? ?? json['startTime'] as String? ?? '08:00',
       endTime: json['end_time'] as String? ?? json['endTime'] as String? ?? '10:30',
@@ -34,6 +40,9 @@ class ActiveTimeline {
           ? DisplaySettings.fromDbJson(settingsJson)
           : null,
       theme: json['current_theme'] as String? ?? json['theme'] as String?,
+      endCard: endCardJson is Map<String, dynamic>
+          ? EndCard.fromJson(endCardJson)
+          : null,
     );
   }
 
@@ -43,6 +52,7 @@ class ActiveTimeline {
         'tasks': tasks.map((t) => t.toJson()).toList(),
         'settings': settings?.toTemplateDbJson(),
         'theme': theme,
+        'endCard': endCard?.toJson(),
       };
 
   ActiveTimeline copyWith({
@@ -51,6 +61,7 @@ class ActiveTimeline {
     List<Task>? tasks,
     DisplaySettings? settings,
     String? theme,
+    EndCard? endCard,
   }) {
     return ActiveTimeline(
       startTime: startTime ?? this.startTime,
@@ -58,6 +69,7 @@ class ActiveTimeline {
       tasks: tasks ?? this.tasks,
       settings: settings ?? this.settings,
       theme: theme ?? this.theme,
+      endCard: endCard ?? this.endCard,
     );
   }
 }

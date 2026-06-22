@@ -5,6 +5,7 @@ import '../../config/theme_constants.dart';
 import '../../data/icon_library.dart';
 import '../../models/active_timeline.dart';
 import '../../models/display_settings.dart';
+import '../../models/end_card.dart';
 import '../../models/task.dart';
 import '../../models/theme_config.dart';
 import '../../providers/school_provider.dart';
@@ -199,6 +200,13 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
                           ],
                         );
                       }),
+                      // End ("Home Time") card — editable, can be hidden
+                      _EndCardCell(
+                        endCard: timeline.endCard ?? EndCard.initial(),
+                        onEdit: () => _editEndCard(context),
+                        onToggle: _toggleEndCard,
+                      ),
+                      const SizedBox(width: 16),
                       // End time
                       _EndTimeCard(
                         endTime:
@@ -387,6 +395,36 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
     ref.read(schoolProvider.notifier).updateTimeline(updated);
   }
 
+  EndCard get _endCard => widget.timeline.endCard ?? EndCard.initial();
+
+  void _editEndCard(BuildContext context) {
+    final schoolId = ref.read(schoolProvider).valueOrNull?.school.id;
+    if (schoolId == null) return;
+    showDialog(
+      context: context,
+      builder: (_) => TaskEditorModal(
+        task: _endCard.task,
+        schoolId: schoolId,
+        isFreeMode: ref.read(schoolProvider).valueOrNull?.isFreeMode ?? false,
+        hideDuration: true,
+        title: 'Edit End Card',
+        onSave: (updatedTask) {
+          ref.read(schoolProvider.notifier).updateTimeline(
+                widget.timeline
+                    .copyWith(endCard: _endCard.copyWith(task: updatedTask)),
+              );
+        },
+      ),
+    );
+  }
+
+  void _toggleEndCard() {
+    ref.read(schoolProvider.notifier).updateTimeline(
+          widget.timeline
+              .copyWith(endCard: _endCard.copyWith(enabled: !_endCard.enabled)),
+        );
+  }
+
   void _toggleBreakAfter(dynamic taskId) {
     final updated = widget.timeline.copyWith(
       tasks: widget.timeline.tasks
@@ -516,6 +554,99 @@ class _TaskEditCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The end ("Home Time") card cell in the editor strip — edit it like a task or
+/// hide it. Sits just before the end-time card.
+class _EndCardCell extends StatelessWidget {
+  final EndCard endCard;
+  final VoidCallback onEdit;
+  final VoidCallback onToggle;
+
+  const _EndCardCell({
+    required this.endCard,
+    required this.onEdit,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final task = endCard.task;
+    final iconData = getIconData(task.icon);
+
+    return Opacity(
+      opacity: endCard.enabled ? 1 : 0.45,
+      child: Container(
+        width: 200,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.brandBgSubtle,
+          border: Border.all(color: AppColors.brandPrimary, width: 2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'End Card',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: AppColors.brandTextMuted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (task.type == 'image' && task.imageUrl != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(task.imageUrl!,
+                    width: 44, height: 44, fit: BoxFit.cover),
+              )
+            else if (iconData != null)
+              Icon(iconData, size: 44, color: AppColors.brandPrimary),
+            const SizedBox(height: 8),
+            Text(
+              task.content,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: onEdit,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.all(8),
+                    ),
+                    child: const Icon(LucideIcons.edit2, size: 16),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: onToggle,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: endCard.enabled
+                          ? AppColors.brandTextMuted
+                          : AppColors.brandSuccess,
+                      padding: const EdgeInsets.all(8),
+                    ),
+                    child: Icon(
+                      endCard.enabled ? LucideIcons.eyeOff : LucideIcons.eye,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

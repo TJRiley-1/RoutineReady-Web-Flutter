@@ -10,12 +10,20 @@ class TaskEditorModal extends StatefulWidget {
   final String schoolId;
   final bool isFreeMode;
 
+  /// Hide the duration control (the end card has no duration).
+  final bool hideDuration;
+
+  /// Dialog title.
+  final String title;
+
   const TaskEditorModal({
     super.key,
     required this.task,
     required this.onSave,
     required this.schoolId,
     this.isFreeMode = false,
+    this.hideDuration = false,
+    this.title = 'Edit Task',
   });
 
   @override
@@ -107,9 +115,9 @@ class _TaskEditorModalState extends State<TaskEditorModal> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Edit Task',
-                      style: TextStyle(
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
@@ -147,31 +155,33 @@ class _TaskEditorModalState extends State<TaskEditorModal> {
                 const SizedBox(height: 16),
 
                 // Duration
-                const Text('Duration (minutes)', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Slider(
-                        value: _duration.toDouble(),
-                        min: 5,
-                        max: 180,
-                        divisions: 35,
-                        label: '$_duration min',
-                        onChanged: (v) =>
-                            setState(() => _duration = v.round()),
+                if (!widget.hideDuration) ...[
+                  const Text('Duration (minutes)', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Slider(
+                          value: _duration.toDouble(),
+                          min: 5,
+                          max: 180,
+                          divisions: 35,
+                          label: '$_duration min',
+                          onChanged: (v) =>
+                              setState(() => _duration = v.round()),
+                        ),
                       ),
-                    ),
-                    SizedBox(
-                      width: 60,
-                      child: Text(
-                        '$_duration min',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      SizedBox(
+                        width: 60,
+                        child: Text(
+                          '$_duration min',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
                 // Image upload (paid only)
                 if (widget.isFreeMode) ...[

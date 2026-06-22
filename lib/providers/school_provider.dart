@@ -6,6 +6,7 @@ import '../models/display_settings.dart';
 import '../models/active_timeline.dart';
 import '../models/template.dart';
 import '../models/task.dart';
+import '../models/end_card.dart';
 import '../models/weekly_schedule.dart';
 import '../models/theme_config.dart';
 import '../data/defaults.dart';
@@ -293,6 +294,9 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
             ? DisplaySettings.fromDbJson(tSettingsJson)
             : const DisplaySettings(),
         theme: t['current_theme'] as String?,
+        endCard: t['end_card_json'] is Map<String, dynamic>
+            ? EndCard.fromJson(t['end_card_json'])
+            : null,
       ));
     }
 
@@ -309,6 +313,9 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
         ? DisplaySettings.fromDbJson(atSettingsJson)
         : null;
     final atTheme = atRes?['current_theme'] as String?;
+    final atEndCard = atRes?['end_card_json'] is Map<String, dynamic>
+        ? EndCard.fromJson(atRes!['end_card_json'])
+        : null;
 
     final timeline = atRes != null
         ? ActiveTimeline(
@@ -319,6 +326,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
                 .toList(),
             settings: atSettings,
             theme: atTheme,
+            endCard: atEndCard,
           )
         : defaultTimelineConfig;
 
@@ -399,6 +407,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
               .toList(),
           settings: todayTemplate.settings,
           theme: todayTemplate.theme,
+          endCard: todayTemplate.endCard,
         );
         result = result.copyWith(
           timeline: autoTimeline,
@@ -425,6 +434,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       'tasks_json': timeline.tasks.map((t) => t.toJson()).toList(),
       'settings_json': timeline.settings?.toTemplateDbJson(),
       'current_theme': timeline.theme,
+      'end_card_json': timeline.endCard?.toJson(),
     };
 
     final existing = await _client
@@ -481,6 +491,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
           'end_time': '10:30',
           'settings_json': const DisplaySettings().toTemplateDbJson(),
           'current_theme': 'routine-ready',
+          'end_card_json': EndCard.initial().toJson(),
         })
         .select()
         .single();
@@ -511,6 +522,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       'tasks_json': defaultTasks.map((t) => t.toJson()).toList(),
       'settings_json': const DisplaySettings().toTemplateDbJson(),
       'current_theme': 'routine-ready',
+      'end_card_json': EndCard.initial().toJson(),
     });
 
     // Create weekly schedule
@@ -635,6 +647,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       tasks: template.tasks.map((t) => Task.fromJson(t.toJson())).toList(),
       settings: template.settings,
       theme: template.theme,
+      endCard: template.endCard,
     );
     final resolved = template.settings.withGlobalsFrom(current.displaySettings);
     final theme = template.theme ?? current.currentTheme;
@@ -926,6 +939,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       // so the display, realtime peers and offline cache stay correct.
       'settings_json': current.displaySettings.toTemplateDbJson(),
       'current_theme': current.currentTheme,
+      'end_card_json': timeline.endCard?.toJson(),
     };
 
     final existing = await _client
@@ -1046,6 +1060,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
             'end_time': t.endTime,
             'settings_json': t.settings.toTemplateDbJson(),
             'current_theme': t.theme,
+            'end_card_json': t.endCard?.toJson(),
           })
           .select()
           .single();

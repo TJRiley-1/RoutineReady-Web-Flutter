@@ -147,6 +147,7 @@ class _AdminShellState extends ConsumerState<AdminShell> {
                   // Capture the current look so it follows this template.
                   settings: schoolState.displaySettings,
                   theme: schoolState.currentTheme,
+                  endCard: schoolState.timeline.endCard,
                 );
                 ref.read(schoolProvider.notifier).updateTemplates(
                     [...schoolState.templates, newTemplate]);

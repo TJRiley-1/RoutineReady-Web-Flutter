@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../models/active_timeline.dart';
 import '../../models/display_settings.dart';
+import '../../models/end_card.dart';
 import '../../models/theme_config.dart';
 import '../../utils/theme_utils.dart';
 import '../../utils/time_utils.dart';
@@ -128,6 +129,16 @@ class _HorizontalDisplayState extends State<HorizontalDisplay> {
                   ],
                 );
               }),
+              // End ("Home Time") card — the last task's trailing transition
+              // above leads into it, giving that task its progress indicator.
+              if ((widget.timeline.endCard ?? EndCard.initial()).enabled) ...[
+                TaskCard(
+                  task: (widget.timeline.endCard ?? EndCard.initial()).task,
+                  theme: widget.theme,
+                  index: widget.timeline.tasks.length,
+                ),
+                const SizedBox(width: 8),
+              ],
               // End time card
               _TimeCard(
                 time: calculateEndTime(
