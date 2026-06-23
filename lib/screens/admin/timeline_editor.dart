@@ -188,15 +188,19 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
 
             // Scrollable task list
             SizedBox(
-              height: 280,
+              height: 266,
               child: Scrollbar(
                 controller: _taskScrollController,
                 thumbVisibility: true,
                 child: SingleChildScrollView(
                   controller: _taskScrollController,
                   scrollDirection: Axis.horizontal,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                  // Top-align with a small pad so the empty space sits below the
+                  // cards, not split evenly above and below.
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Start time
                       _StartTimeCard(
@@ -293,6 +297,7 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
                             calculateEndTime(timeline.startTime, timeline.tasks),
                       ),
                     ],
+                  ),
                   ),
                 ),
               ),
