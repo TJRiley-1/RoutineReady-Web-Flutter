@@ -146,49 +146,40 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
             }),
             const SizedBox(height: 16),
 
-            // Card size controls — bump every task card (and the End card) bigger
-            // or smaller at once.
+            // Card size controls — adjust width and height of every task card
+            // (and the End card) independently.
             Builder(builder: (context) {
-              final canGrow = timeline.tasks
-                  .any((t) => t.width < _maxCardWidth || t.height < _maxCardHeight);
-              final canShrink = timeline.tasks
-                  .any((t) => t.width > _minCardWidth || t.height > _minCardHeight);
               final hasTasks = timeline.tasks.isNotEmpty;
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              final canWiden =
+                  timeline.tasks.any((t) => t.width < _maxCardWidth);
+              final canNarrow =
+                  timeline.tasks.any((t) => t.width > _minCardWidth);
+              final canTaller =
+                  timeline.tasks.any((t) => t.height < _maxCardHeight);
+              final canShorter =
+                  timeline.tasks.any((t) => t.height > _minCardHeight);
+              return Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 24,
+                runSpacing: 8,
                 children: [
-                  const Icon(LucideIcons.scaling,
-                      size: 16, color: AppColors.brandTextMuted),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Card size',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.brandText,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton(
-                    onPressed: hasTasks && canShrink
-                        ? () => _resizeAllCards(-_cardWidthStep, -_cardHeightStep)
+                  _SizeStepper(
+                    label: 'Width',
+                    onDecrease: hasTasks && canNarrow
+                        ? () => _resizeAllCards(-_cardWidthStep, 0)
                         : null,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(44, 40),
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Icon(LucideIcons.minus, size: 18),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: hasTasks && canGrow
-                        ? () => _resizeAllCards(_cardWidthStep, _cardHeightStep)
+                    onIncrease: hasTasks && canWiden
+                        ? () => _resizeAllCards(_cardWidthStep, 0)
                         : null,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(44, 40),
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Icon(LucideIcons.plus, size: 18),
+                  ),
+                  _SizeStepper(
+                    label: 'Height',
+                    onDecrease: hasTasks && canShorter
+                        ? () => _resizeAllCards(0, -_cardHeightStep)
+                        : null,
+                    onIncrease: hasTasks && canTaller
+                        ? () => _resizeAllCards(0, _cardHeightStep)
+                        : null,
                   ),
                 ],
               );
@@ -911,6 +902,57 @@ class _RowBreakToggle extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A labelled −/+ stepper for adjusting one card dimension (width or height)
+/// across all cards. Buttons are disabled (null callback) at the clamp edge.
+class _SizeStepper extends StatelessWidget {
+  final String label;
+  final VoidCallback? onDecrease;
+  final VoidCallback? onIncrease;
+
+  const _SizeStepper({
+    required this.label,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(LucideIcons.scaling, size: 16, color: AppColors.brandTextMuted),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.brandText,
+          ),
+        ),
+        const SizedBox(width: 12),
+        OutlinedButton(
+          onPressed: onDecrease,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(44, 40),
+            padding: EdgeInsets.zero,
+          ),
+          child: const Icon(LucideIcons.minus, size: 18),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: onIncrease,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(44, 40),
+            padding: EdgeInsets.zero,
+          ),
+          child: const Icon(LucideIcons.plus, size: 18),
+        ),
+      ],
     );
   }
 }
