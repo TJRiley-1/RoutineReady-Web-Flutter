@@ -188,7 +188,7 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
 
             // Scrollable task list
             SizedBox(
-              height: 320,
+              height: 280,
               child: Scrollbar(
                 controller: _taskScrollController,
                 thumbVisibility: true,
