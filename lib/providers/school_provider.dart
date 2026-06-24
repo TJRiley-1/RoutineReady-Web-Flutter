@@ -263,7 +263,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
         .from('templates')
         .select()
         .eq('school_id', school.id)
-        .order('position');
+        .order('position', ascending: true);
 
     final templates = <TaskTemplate>[];
     for (final t in (templatesRes as List)) {
