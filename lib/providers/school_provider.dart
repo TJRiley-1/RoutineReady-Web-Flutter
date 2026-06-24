@@ -539,8 +539,29 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
   void updateTimeline(ActiveTimeline timeline) {
     final current = state.valueOrNull;
     if (current == null) return;
+
+    // Keep the active template's in-memory copy in sync so a later reload /
+    // template switch / saveAll reflects task, time and end-card edits. Without
+    // this, edits (e.g. card size, transition scale) live only on active_timeline
+    // and are lost when saveAll rewrites templates from a stale copy. Mirrors the
+    // sync already done in updateDisplaySettings / updateCurrentTheme.
+    final activeId = current.activeTemplateId;
+    final templates = activeId != null
+        ? current.templates
+            .map((t) => t.id.toString() == activeId
+                ? t.copyWith(
+                    tasks: timeline.tasks,
+                    startTime: timeline.startTime,
+                    endTime: timeline.endTime,
+                    endCard: timeline.endCard,
+                  )
+                : t)
+            .toList()
+        : current.templates;
+
     state = AsyncData(current.copyWith(
       timeline: timeline,
+      templates: templates,
       hasUnsavedChanges: true,
       isUsingCachedData: false,
     ));

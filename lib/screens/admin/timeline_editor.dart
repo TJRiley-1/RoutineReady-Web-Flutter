@@ -80,34 +80,79 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
           children: [
             // Header
             Builder(builder: (context) {
-              final isFree = ref.watch(schoolProvider).valueOrNull?.isFreeMode ?? false;
+              final schoolState = ref.watch(schoolProvider).valueOrNull;
+              final isFree = schoolState?.isFreeMode ?? false;
               final atLimit = isFree && timeline.tasks.length >= 5;
+              // Which template is being edited (null = an unsaved, ad-hoc timeline).
+              final activeId = schoolState?.activeTemplateId;
+              final activeName = activeId != null
+                  ? schoolState?.templates
+                      .where((t) => t.id.toString() == activeId)
+                      .firstOrNull
+                      ?.name
+                  : null;
               return Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Centred title
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  // Centred title + which template is being edited
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Edit Tasks',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.brandText,
-                        ),
-                      ),
-                      if (isFree) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          '${timeline.tasks.length}/5',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: atLimit ? AppColors.brandError : AppColors.brandTextMuted,
-                            fontWeight: FontWeight.w500,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'Edit Tasks',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.brandText,
+                            ),
                           ),
-                        ),
-                      ],
+                          if (isFree) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              '${timeline.tasks.length}/5',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: atLimit
+                                    ? AppColors.brandError
+                                    : AppColors.brandTextMuted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            activeName != null
+                                ? LucideIcons.fileText
+                                : LucideIcons.fileQuestion,
+                            size: 13,
+                            color: AppColors.brandTextMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              activeName != null
+                                  ? 'Editing: $activeName'
+                                  : 'Editing: unsaved timeline (not based on a template)',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.brandTextMuted,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   // Right-aligned buttons
