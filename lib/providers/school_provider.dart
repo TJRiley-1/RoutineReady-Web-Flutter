@@ -263,7 +263,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
         .from('templates')
         .select()
         .eq('school_id', school.id)
-        .order('created_at');
+        .order('position');
 
     final templates = <TaskTemplate>[];
     for (final t in (templatesRes as List)) {
@@ -749,6 +749,69 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
     ));
   }
 
+  /// Renames a saved template in place. Marks unsaved; persisted on saveAll.
+  void renameTemplate(dynamic id, String newName) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return;
+    final updated = current.templates
+        .map((t) => t.id.toString() == id.toString()
+            ? t.copyWith(name: trimmed)
+            : t)
+        .toList();
+    updateTemplates(updated);
+  }
+
+  /// Duplicates a saved template, inserting the copy directly after the
+  /// original with an auto-incremented name ("Monday" -> "Monday 1"). The copy
+  /// gets a fresh client-side id; a real id is assigned by the DB on save.
+  void duplicateTemplate(dynamic id) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final templates = current.templates;
+    final index = templates.indexWhere((t) => t.id.toString() == id.toString());
+    if (index < 0) return;
+    final source = templates[index];
+
+    final existingNames = templates.map((t) => t.name).toSet();
+    final newName = _nextDuplicateName(source.name, existingNames);
+
+    final copy = source.copyWith(
+      id: 'new-${DateTime.now().microsecondsSinceEpoch}',
+      name: newName,
+      tasks: source.tasks.map((t) => t.copyWith()).toList(),
+    );
+
+    final updated = [...templates];
+    updated.insert(index + 1, copy);
+    updateTemplates(updated);
+  }
+
+  /// Moves a saved template within the list (display order only).
+  void reorderTemplates(int oldIndex, int newIndex) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final templates = [...current.templates];
+    if (oldIndex < 0 || oldIndex >= templates.length) return;
+    if (newIndex < 0 || newIndex >= templates.length) return;
+    final moved = templates.removeAt(oldIndex);
+    templates.insert(newIndex, moved);
+    updateTemplates(templates);
+  }
+
+  /// Picks the lowest-numbered free name of the form "$base $n". Strips an
+  /// existing trailing number so duplicating "Monday 1" yields "Monday 2".
+  String _nextDuplicateName(String name, Set<String> existing) {
+    final match = RegExp(r'^(.*?)\s+\d+$').firstMatch(name);
+    final base = (match != null ? match.group(1)! : name).trim();
+    var n = 1;
+    while (existing.contains('$base $n')) {
+      n++;
+    }
+    return '$base $n';
+  }
+
   void updateWeeklySchedule(WeeklySchedule schedule) {
     final current = state.valueOrNull;
     if (current == null) return;
@@ -1086,7 +1149,8 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
 
     final idMap = <String, String>{};
 
-    for (final t in allTemplates) {
+    for (final entry in allTemplates.asMap().entries) {
+      final t = entry.value;
       final res = await _client
           .from('templates')
           .insert({
@@ -1094,6 +1158,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
             'name': t.name,
             'start_time': t.startTime,
             'end_time': t.endTime,
+            'position': entry.key,
             'settings_json': t.settings.toTemplateDbJson(),
             'current_theme': t.theme,
             'end_card_json': t.endCard?.toJson(),

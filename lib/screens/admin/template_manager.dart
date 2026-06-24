@@ -111,12 +111,17 @@ class _TemplateManagerState extends ConsumerState<TemplateManager> {
                   spacing: 12,
                   runSpacing: 12,
                   alignment: WrapAlignment.center,
-                  children: widget.templates.map((template) {
+                  children:
+                      widget.templates.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final template = entry.value;
                     final isAssigning =
                         _assigningTemplateId == template.id.toString();
                     return _TemplateCard(
                       template: template,
                       isAssigning: isAssigning,
+                      canMoveUp: index > 0,
+                      canMoveDown: index < widget.templates.length - 1,
                       onAssign: () {
                         setState(() {
                           _assigningTemplateId = isAssigning
@@ -126,6 +131,16 @@ class _TemplateManagerState extends ConsumerState<TemplateManager> {
                       },
                       onLoad: () => _loadTemplate(template),
                       onDelete: () => _deleteTemplate(template),
+                      onRename: () => _renameTemplate(template),
+                      onDuplicate: () => ref
+                          .read(schoolProvider.notifier)
+                          .duplicateTemplate(template.id),
+                      onMoveUp: () => ref
+                          .read(schoolProvider.notifier)
+                          .reorderTemplates(index, index - 1),
+                      onMoveDown: () => ref
+                          .read(schoolProvider.notifier)
+                          .reorderTemplates(index, index + 1),
                     );
                   }).toList(),
                 ),
@@ -143,6 +158,42 @@ class _TemplateManagerState extends ConsumerState<TemplateManager> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Loaded "${template.name}"')),
+    );
+  }
+
+  void _renameTemplate(TaskTemplate template) {
+    final controller = TextEditingController(text: template.name);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rename Template'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Template name'),
+          onSubmitted: (_) {
+            Navigator.pop(ctx);
+            ref
+                .read(schoolProvider.notifier)
+                .renameTemplate(template.id, controller.text);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref
+                  .read(schoolProvider.notifier)
+                  .renameTemplate(template.id, controller.text);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -334,16 +385,28 @@ class _DayCard extends StatelessWidget {
 class _TemplateCard extends StatelessWidget {
   final TaskTemplate template;
   final bool isAssigning;
+  final bool canMoveUp;
+  final bool canMoveDown;
   final VoidCallback onAssign;
   final VoidCallback onLoad;
   final VoidCallback onDelete;
+  final VoidCallback onRename;
+  final VoidCallback onDuplicate;
+  final VoidCallback onMoveUp;
+  final VoidCallback onMoveDown;
 
   const _TemplateCard({
     required this.template,
     required this.isAssigning,
+    required this.canMoveUp,
+    required this.canMoveDown,
     required this.onAssign,
     required this.onLoad,
     required this.onDelete,
+    required this.onRename,
+    required this.onDuplicate,
+    required this.onMoveUp,
+    required this.onMoveDown,
   });
 
   @override
@@ -361,20 +424,63 @@ class _TemplateCard extends StatelessWidget {
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (template.id != 'default')
+              // Reorder arrows (display order only).
+              IconButton(
+                onPressed: canMoveUp ? onMoveUp : null,
+                icon: const Icon(Icons.arrow_upward),
+                iconSize: 16,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: 'Move left',
+              ),
+              IconButton(
+                onPressed: canMoveDown ? onMoveDown : null,
+                icon: const Icon(Icons.arrow_downward),
+                iconSize: 16,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: 'Move right',
+              ),
+              const Spacer(),
+              if (template.id != 'default') ...[
+                IconButton(
+                  onPressed: onRename,
+                  icon: const Icon(Icons.edit),
+                  iconSize: 16,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 28, minHeight: 28),
+                  tooltip: 'Rename',
+                ),
+                IconButton(
+                  onPressed: onDuplicate,
+                  icon: const Icon(Icons.content_copy),
+                  iconSize: 15,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 28, minHeight: 28),
+                  tooltip: 'Duplicate',
+                ),
                 GestureDetector(
                   onTap: onDelete,
-                  child: const Text(
-                    'Delete',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.brandError,
-                      fontWeight: FontWeight.w500,
+                  child: const Padding(
+                    padding: EdgeInsets.only(left: 4),
+                    child: Text(
+                      'Delete',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.brandError,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
+              ],
             ],
           ),
           Text(
