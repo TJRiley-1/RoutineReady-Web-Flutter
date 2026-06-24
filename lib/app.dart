@@ -15,6 +15,7 @@ import 'screens/auth/setup_wizard_screen.dart';
 import 'screens/classroom_picker/classroom_picker_screen.dart';
 import 'screens/classroom_picker/all_classrooms_picker_screen.dart';
 import 'screens/mode_select/mode_select_screen.dart';
+import 'screens/locked/subscription_locked_screen.dart';
 import 'screens/display/display_screen.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/staff_admin/staff_admin_shell.dart';
@@ -280,6 +281,13 @@ class _LegacyRouter extends ConsumerWidget {
           );
         }
 
+        // Subscription switched off by RR staff. Only lock on a *confirmed*
+        // inactive classroom — cached/offline data falls through so the display
+        // never goes blank on a network blip.
+        if (!state.school.isActive && !state.isUsingCachedData) {
+          return const SubscriptionLockedScreen();
+        }
+
         if (sessionMode == null) {
           return const ModeSelectScreen();
         }
@@ -342,6 +350,13 @@ class _RoleBasedRouter extends ConsumerWidget {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
+        }
+
+        // Subscription switched off by RR staff. Only lock on a *confirmed*
+        // inactive classroom — cached/offline data falls through so the display
+        // never goes blank on a network blip.
+        if (!state.school.isActive && !state.isUsingCachedData) {
+          return const SubscriptionLockedScreen();
         }
 
         // Enable session-only mode for staff (edits don't persist)
