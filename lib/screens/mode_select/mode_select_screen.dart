@@ -15,36 +15,8 @@ class ModeSelectScreen extends ConsumerStatefulWidget {
 }
 
 class _ModeSelectScreenState extends ConsumerState<ModeSelectScreen> {
-  bool _isLoading = false;
-  String? _error;
-
-  Future<void> _selectMode(String mode) async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final sessionNotifier = ref.read(displaySessionProvider.notifier);
-      final result = await sessionNotifier.registerSession(
-          mode == 'display' ? 'display' : 'admin_only');
-
-      if (!result.slotAvailable && mode == 'display') {
-        setState(() {
-          _error =
-              'All display slots are in use (${result.activeDisplayCount}/${result.maxDisplaySlots}). '
-              'You can still use Admin Mode.';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      ref.read(sessionModeProvider.notifier).state = mode;
-    } catch (e) {
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _selectMode(String mode) {
+    ref.read(sessionModeProvider.notifier).state = mode;
   }
 
   @override
@@ -91,25 +63,6 @@ class _ModeSelectScreenState extends ConsumerState<ModeSelectScreen> {
                   style: TextStyle(color: AppColors.brandTextMuted),
                 ),
                 const SizedBox(height: 40),
-                if (_error != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 24),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.warning_amber,
-                            color: Colors.amber, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(_error!)),
-                      ],
-                    ),
-                  ),
-                ],
                 IntrinsicHeight(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -121,7 +74,6 @@ class _ModeSelectScreenState extends ConsumerState<ModeSelectScreen> {
                           description:
                               'Full-screen view for students.\nShows the daily schedule timeline.',
                           color: AppColors.brandPrimary,
-                          isLoading: _isLoading,
                           onTap: () => _selectMode('display'),
                         ),
                       ),
@@ -133,7 +85,6 @@ class _ModeSelectScreenState extends ConsumerState<ModeSelectScreen> {
                           description:
                               'Edit tasks, templates, themes, and display settings.',
                           color: AppColors.brandAccent,
-                          isLoading: _isLoading,
                           onTap: () => _selectMode('admin'),
                         ),
                       ),
@@ -178,7 +129,6 @@ class _ModeCard extends StatelessWidget {
   final String title;
   final String description;
   final Color color;
-  final bool isLoading;
   final VoidCallback onTap;
 
   const _ModeCard({
@@ -186,7 +136,6 @@ class _ModeCard extends StatelessWidget {
     required this.title,
     required this.description,
     required this.color,
-    required this.isLoading,
     required this.onTap,
   });
 
@@ -196,7 +145,7 @@ class _ModeCard extends StatelessWidget {
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
-        onTap: isLoading ? null : onTap,
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(32),

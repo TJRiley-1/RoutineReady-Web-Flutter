@@ -255,7 +255,6 @@ class _DisplayScreenState extends ConsumerState<DisplayScreen>
   }
 
   void _exitToModeSelect() {
-    ref.read(displaySessionProvider.notifier).endSession();
     ref.read(sessionModeProvider.notifier).state = null;
   }
 }

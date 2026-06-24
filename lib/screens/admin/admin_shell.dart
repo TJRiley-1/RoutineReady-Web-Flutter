@@ -89,7 +89,6 @@ class _AdminShellState extends ConsumerState<AdminShell> {
   }
 
   void _exitAdmin() {
-    ref.read(displaySessionProvider.notifier).endSession();
     ref.read(sessionModeProvider.notifier).state = null;
   }
 
