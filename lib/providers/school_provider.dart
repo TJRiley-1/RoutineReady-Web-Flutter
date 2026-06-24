@@ -271,7 +271,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
           .from('tasks')
           .select()
           .eq('template_id', t['id'])
-          .order('sort_order');
+          .order('sort_order', ascending: true);
 
       final tSettingsJson = t['settings_json'];
       templates.add(TaskTemplate(
@@ -361,7 +361,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
         .from('custom_themes')
         .select()
         .eq('school_id', school.id)
-        .order('created_at');
+        .order('created_at', ascending: true);
 
     final customThemes = (ctRes as List).map((t) {
       final base = presetThemes['routine-ready']!;

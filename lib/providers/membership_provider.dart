@@ -57,7 +57,7 @@ final classroomsProvider = FutureProvider<List<School>>((ref) async {
       .from('schools')
       .select()
       .eq('org_id', membership.orgId)
-      .order('class_name');
+      .order('class_name', ascending: true);
   return (res as List).map((s) => School.fromJson(s)).toList();
 });
 
@@ -69,8 +69,12 @@ final staffAllClassroomsProvider =
     FutureProvider<List<OrgClassrooms>>((ref) async {
   final client = ref.read(supabaseClientProvider);
 
-  final orgsRes = await client.from('organizations').select().order('name');
-  final schoolsRes = await client.from('schools').select().order('class_name');
+  final orgsRes =
+      await client.from('organizations').select().order('name', ascending: true);
+  final schoolsRes = await client
+      .from('schools')
+      .select()
+      .order('class_name', ascending: true);
 
   final orgs = (orgsRes as List).map((o) => Organization.fromJson(o)).toList();
   final schools = (schoolsRes as List).map((s) => School.fromJson(s)).toList();
