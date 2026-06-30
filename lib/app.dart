@@ -10,6 +10,7 @@ import 'providers/session_provider.dart';
 import 'providers/staff_admin_provider.dart';
 import 'providers/subscription_provider.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/session_expired_screen.dart';
 import 'screens/auth/set_password_screen.dart';
 import 'screens/auth/setup_wizard_screen.dart';
 import 'screens/classroom_picker/classroom_picker_screen.dart';
@@ -41,12 +42,18 @@ class _AppRouter extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
     final mustSetPassword = ref.watch(mustSetPasswordProvider);
+    final isExplicitSignOut = ref.watch(isExplicitSignOutProvider);
 
     // Latch recovery mode so it survives the subsequent userUpdated event.
+    // Reset the explicit-signout flag when the user signs back in so the next
+    // unintentional session loss shows the expired screen again, not the form.
     ref.listen(authStateProvider, (_, next) {
       next.whenData((state) {
         if (state.event == AuthChangeEvent.passwordRecovery) {
           ref.read(mustSetPasswordProvider.notifier).state = true;
+        }
+        if (state.event == AuthChangeEvent.signedIn) {
+          ref.read(isExplicitSignOutProvider.notifier).state = false;
         }
       });
     });
@@ -63,7 +70,13 @@ class _AppRouter extends ConsumerWidget {
           return const SetPasswordScreen();
         }
         if (state.session == null) {
-          return const LoginScreen();
+          // Only show the full login form when the user deliberately signed out.
+          // An unexpected session loss (token refresh failure, expiry) shows a
+          // non-interactive notice so the display doesn't expose a login form
+          // unattended in a classroom.
+          return isExplicitSignOut
+              ? const LoginScreen()
+              : const SessionExpiredScreen();
         }
         return const _AuthenticatedRouter();
       },

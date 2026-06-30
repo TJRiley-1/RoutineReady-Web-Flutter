@@ -63,8 +63,8 @@ Future<bool> checkRevenueCatEntitlement() async {
 /// 2. School-level subscription (manually set up by admin)
 /// 3. No subscription = free tier
 final subscriptionPlanProvider = FutureProvider<String>((ref) async {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return 'free';
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return 'free';
 
   final client = ref.read(supabaseClientProvider);
 
@@ -72,7 +72,7 @@ final subscriptionPlanProvider = FutureProvider<String>((ref) async {
   final userSub = await client
       .from('subscriptions')
       .select('plan, status')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('status', 'active')
       .limit(1)
       .maybeSingle();
@@ -101,7 +101,7 @@ final subscriptionPlanProvider = FutureProvider<String>((ref) async {
   final school = await client
       .from('schools')
       .select('id')
-      .eq('owner_id', user.id)
+      .eq('owner_id', userId)
       .limit(1)
       .maybeSingle();
 
@@ -121,8 +121,8 @@ final subscriptionPlanProvider = FutureProvider<String>((ref) async {
 
 /// Full subscription state with slot limits.
 final subscriptionProvider = FutureProvider<SubscriptionState>((ref) async {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return SubscriptionState.free();
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return SubscriptionState.free();
 
   final client = ref.read(supabaseClientProvider);
 
@@ -130,7 +130,7 @@ final subscriptionProvider = FutureProvider<SubscriptionState>((ref) async {
   final userSub = await client
       .from('subscriptions')
       .select()
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('status', 'active')
       .limit(1)
       .maybeSingle();
@@ -179,7 +179,7 @@ final subscriptionProvider = FutureProvider<SubscriptionState>((ref) async {
   final school = await client
       .from('schools')
       .select('id')
-      .eq('owner_id', user.id)
+      .eq('owner_id', userId)
       .limit(1)
       .maybeSingle();
 

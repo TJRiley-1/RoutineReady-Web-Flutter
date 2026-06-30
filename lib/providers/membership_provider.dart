@@ -9,15 +9,15 @@ const _rememberedClassroomKey = 'routine_ready_remembered_classroom';
 
 /// The current user's org membership (role + org info).
 final membershipProvider = FutureProvider<OrgMember?>((ref) async {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return null;
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return null;
 
   final client = ref.read(supabaseClientProvider);
 
   final res = await client
       .from('org_members')
       .select()
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .limit(1)
       .maybeSingle();
 

@@ -20,6 +20,15 @@ final currentUserProvider = Provider<User?>((ref) {
   return session?.user;
 });
 
+/// Stable provider that returns only the user ID string.
+/// Data-fetching providers should watch this instead of [currentUserProvider]
+/// so that hourly JWT token refreshes — which produce a new User object with
+/// the same ID — do not trigger unnecessary DB queries.
+final currentUserIdProvider = Provider<String?>((ref) {
+  final authState = ref.watch(authStateProvider);
+  return authState.whenOrNull(data: (state) => state.session?.user.id);
+});
+
 final authActionsProvider = Provider<AuthActions>((ref) {
   return AuthActions(ref);
 });
@@ -29,6 +38,11 @@ final authActionsProvider = Provider<AuthActions>((ref) {
 /// the `AuthChangeEvent.passwordRecovery` event or seeded from the launch URL
 /// `type` (invite/recovery); cleared once the password is set.
 final mustSetPasswordProvider = StateProvider<bool>((ref) => false);
+
+/// True when the current sign-out was triggered explicitly by the user.
+/// False means the session was lost unexpectedly (refresh failure, expiry, etc.)
+/// and the display should show a session-expired notice rather than the login form.
+final isExplicitSignOutProvider = StateProvider<bool>((ref) => false);
 
 /// The `type` param from the launch URL (e.g. 'invite', 'recovery'), captured in
 /// main() before Supabase consumes the URL. Used to seed [mustSetPasswordProvider].
@@ -59,6 +73,7 @@ class AuthActions {
   }
 
   Future<void> signOut() async {
+    _ref.read(isExplicitSignOutProvider.notifier).state = true;
     await _client.auth.signOut();
   }
 

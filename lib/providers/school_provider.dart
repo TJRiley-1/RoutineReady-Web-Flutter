@@ -107,8 +107,8 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       _customThemesDebounce?.cancel();
     });
 
-    final user = ref.watch(currentUserProvider);
-    if (user == null) return null;
+    final userId = ref.watch(currentUserIdProvider);
+    if (userId == null) return null;
 
     // Load cached display data first so the display has something to show immediately
     final cachedState = await _loadFromCache();
@@ -124,7 +124,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
         result = await _loadByClassroomId(selectedClassroom.id);
       } else {
         // Legacy flow: load by owner_id (for users without org membership)
-        result = await _loadAllData(user.id);
+        result = await _loadAllData(userId);
       }
 
       if (result != null) {
@@ -187,9 +187,9 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
       if (selectedClassroom != null) {
         result = await _loadByClassroomId(selectedClassroom.id);
       } else {
-        final user = ref.read(currentUserProvider);
-        if (user == null) return;
-        result = await _loadAllData(user.id);
+        final uid = ref.read(currentUserIdProvider);
+        if (uid == null) return;
+        result = await _loadAllData(uid);
       }
 
       if (result != null) {
@@ -271,28 +271,41 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
     final defaultTheme =
         dsRes != null ? (dsRes['current_theme'] as String? ?? 'routine-ready') : 'routine-ready';
 
-    // 3. Load templates with tasks
+    // 3. Load templates with tasks — two queries instead of 1+N.
     final templatesRes = await _client
         .from('templates')
         .select()
         .eq('school_id', school.id)
         .order('position', ascending: true);
 
-    final templates = <TaskTemplate>[];
-    for (final t in (templatesRes as List)) {
-      final tasksRes = await _client
+    final templateList = templatesRes as List;
+    final templateIds = templateList.map((t) => t['id'] as String).toList();
+
+    // Fetch all tasks for every template in a single round-trip, then group.
+    final Map<String, List<Map<String, dynamic>>> tasksByTemplate = {};
+    if (templateIds.isNotEmpty) {
+      final allTasksRes = await _client
           .from('tasks')
           .select()
-          .eq('template_id', t['id'])
+          .inFilter('template_id', templateIds)
           .order('sort_order', ascending: true);
 
+      for (final task in (allTasksRes as List)) {
+        final tid = task['template_id'] as String;
+        tasksByTemplate.putIfAbsent(tid, () => []).add(task as Map<String, dynamic>);
+      }
+    }
+
+    final templates = <TaskTemplate>[];
+    for (final t in templateList) {
+      final tId = t['id'] as String;
       final tSettingsJson = t['settings_json'];
       templates.add(TaskTemplate(
-        id: t['id'],
+        id: tId,
         name: t['name'] ?? 'Untitled',
         startTime: t['start_time'] ?? '08:00',
         endTime: t['end_time'] ?? '10:30',
-        tasks: (tasksRes as List).map((task) => Task(
+        tasks: (tasksByTemplate[tId] ?? []).map((task) => Task(
           id: task['id'],
           type: task['type'] ?? 'text',
           content: task['content'] ?? 'New Task',
