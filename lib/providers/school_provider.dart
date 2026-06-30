@@ -1026,7 +1026,8 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
   /// Returns true if DB writes should be skipped (free tier).
   bool get _skipDbWrites =>
       (state.valueOrNull?.isFreeMode ?? false) ||
-      (state.valueOrNull?.isSessionOnlyMode ?? false);
+      (state.valueOrNull?.isSessionOnlyMode ?? false) ||
+      (state.valueOrNull?.isUsingCachedData ?? false);
 
   Future<void> _saveDisplaySettingsToDb(
       DisplaySettings settings, String theme) async {

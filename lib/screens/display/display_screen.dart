@@ -45,9 +45,11 @@ class _DisplayScreenState extends ConsumerState<DisplayScreen>
       // Chromium --kiosk handles this; no extra action needed
     }
 
-    // Subscribe to realtime
+    // Subscribe to realtime only if real data is already loaded.
+    // If only cached data is available yet, the ref.listen in build() will
+    // subscribe once the Supabase load completes and replaces the cache.
     final schoolState = ref.read(schoolProvider).valueOrNull;
-    if (schoolState != null) {
+    if (schoolState != null && !schoolState.isUsingCachedData) {
       ref.read(realtimeProvider).subscribe(schoolState.school.id);
     }
 
@@ -72,9 +74,8 @@ class _DisplayScreenState extends ConsumerState<DisplayScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Reconnect realtime on resume
       final schoolState = ref.read(schoolProvider).valueOrNull;
-      if (schoolState != null) {
+      if (schoolState != null && !schoolState.isUsingCachedData) {
         ref.read(realtimeProvider).subscribe(schoolState.school.id);
       }
       _updateProgress();
@@ -101,6 +102,18 @@ class _DisplayScreenState extends ConsumerState<DisplayScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Subscribe to realtime as soon as real data replaces the startup cache,
+    // or whenever the active classroom changes (e.g. staff switching rooms).
+    ref.listen<AsyncValue<SchoolState?>>(schoolProvider, (previous, next) {
+      final prev = previous?.valueOrNull;
+      final curr = next.valueOrNull;
+      if (curr == null || curr.isUsingCachedData) return;
+      final prevId = (prev != null && !prev.isUsingCachedData) ? prev.school.id : null;
+      if (curr.school.id != prevId) {
+        ref.read(realtimeProvider).subscribe(curr.school.id);
+      }
+    });
+
     final schoolState = ref.watch(schoolProvider).valueOrNull;
     if (schoolState == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
