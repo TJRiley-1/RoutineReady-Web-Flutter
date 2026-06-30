@@ -33,6 +33,24 @@
 
   <title>Routine Ready</title>
   <link rel="manifest" href="manifest.json">
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      // When a new service worker takes control (new build deployed), reload
+      // immediately so the display picks up the update without manual intervention.
+      // Flutter's service worker calls skipWaiting() so activation is instant.
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+      });
+
+      // Actively poll for new service worker versions every 5 minutes.
+      // Without this, Chrome only checks every 24 hours on a continuously open tab,
+      // meaning wall-mounted displays would run stale code for up to a day.
+      navigator.serviceWorker.ready.then(registration => {
+        setInterval(() => registration.update(), 5 * 60 * 1000);
+      });
+    }
+  </script>
 </head>
 <body>
   <!--
