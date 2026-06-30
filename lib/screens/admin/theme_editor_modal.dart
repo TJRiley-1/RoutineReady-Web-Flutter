@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../config/theme_constants.dart';
 import '../../data/preset_themes.dart';
 import '../../models/theme_config.dart';
@@ -29,7 +30,7 @@ class _ThemeEditorModalState extends ConsumerState<ThemeEditorModal> {
     super.initState();
     _theme = widget.editingTheme ??
         presetThemes['routine-ready']!.copyWith(
-          id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
+          id: const Uuid().v4(),
           name: 'Custom Theme',
           emoji: '\u{1F3A8}',
         );

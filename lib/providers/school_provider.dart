@@ -928,6 +928,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
     required String teacherName,
     String? deviceName,
   }) async {
+    if (_skipDbWrites) return;
     final current = state.valueOrNull;
     if (current == null) return;
 
@@ -949,6 +950,7 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
   }
 
   Future<void> resetAll() async {
+    if (_skipDbWrites) return;
     final current = state.valueOrNull;
     if (current == null) return;
     await _client.from('schools').delete().eq('id', current.school.id);
@@ -1052,9 +1054,17 @@ class SchoolNotifier extends AsyncNotifier<SchoolState?> {
     final current = state.valueOrNull;
     if (current == null) return;
 
+    // Strip client-side placeholder IDs (e.g. 'new-{timestamp}') — only store
+    // a template_id when it refers to a real DB row. Mirrors the guard in
+    // _saveTemplateSettingsToDb.
+    final resolvedTemplateId =
+        (templateId != null && _uuidPattern.hasMatch(templateId))
+            ? templateId
+            : null;
+
     final payload = {
       'school_id': current.school.id,
-      'template_id': templateId,
+      'template_id': resolvedTemplateId,
       'start_time': timeline.startTime,
       'end_time': timeline.endTime,
       'tasks_json': timeline.tasks.map((t) => t.toJson()).toList(),

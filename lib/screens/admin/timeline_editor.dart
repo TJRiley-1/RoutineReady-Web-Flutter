@@ -580,14 +580,16 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
   EndCard get _endCard => widget.timeline.endCard ?? EndCard.initial();
 
   void _editEndCard(BuildContext context) {
-    final schoolId = ref.read(schoolProvider).valueOrNull?.school.id;
+    final schoolState = ref.read(schoolProvider).valueOrNull;
+    final schoolId = schoolState?.school.id;
     if (schoolId == null) return;
     showDialog(
       context: context,
       builder: (_) => TaskEditorModal(
         task: _endCard.task,
         schoolId: schoolId,
-        isFreeMode: ref.read(schoolProvider).valueOrNull?.isFreeMode ?? false,
+        isFreeMode: (schoolState?.isFreeMode ?? false) ||
+            (schoolState?.isUsingCachedData ?? false),
         hideDuration: true,
         title: 'Edit End Card',
         onSave: (updatedTask) {
@@ -694,14 +696,16 @@ class _TimelineEditorState extends ConsumerState<TimelineEditor> {
   }
 
   void _editTask(BuildContext context, Task task) {
-    final schoolId = ref.read(schoolProvider).valueOrNull?.school.id;
+    final schoolState = ref.read(schoolProvider).valueOrNull;
+    final schoolId = schoolState?.school.id;
     if (schoolId == null) return;
     showDialog(
       context: context,
       builder: (_) => TaskEditorModal(
         task: task,
         schoolId: schoolId,
-        isFreeMode: ref.read(schoolProvider).valueOrNull?.isFreeMode ?? false,
+        isFreeMode: (schoolState?.isFreeMode ?? false) ||
+            (schoolState?.isUsingCachedData ?? false),
         onSave: (updatedTask) {
           final updated = widget.timeline.copyWith(
             tasks: widget.timeline.tasks
